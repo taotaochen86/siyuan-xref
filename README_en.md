@@ -31,10 +31,31 @@ Settings live under **Settings → Marketplace → Downloaded → Figure & Equat
 |---|---|---|
 | Insert cross-reference | `Ctrl+Alt+R` | Plugin settings → Custom hotkeys → click the field, press the combination |
 | Renumber now | `Ctrl+Alt+N` | Same panel, second row |
+| Undo last renumber | `Ctrl+Alt+Z` | Same panel, third row |
+| Redo | `Ctrl+Alt+Y` | Same panel, fourth row |
 
 - A combination **must include Ctrl / Alt / ⌘** — single keys are rejected on purpose so typing never triggers them. `Backspace` clears, `Esc` cancels.
 - Both actions are also registered as **native commands**, so they show up under **Settings → Hotkeys → Plugin**. Setting the same key in both places still runs the action only once (400 ms de-duplication).
 - Hotkeys are ignored inside inputs, search boxes, settings panels and the plugin's own picker, and while an IME is composing.
+
+## Undo and redo
+
+**Why not `Ctrl+Z`**: SiYuan's undo stack only records edits initiated by the editor itself. The plugin writes through `/api/block/updateBlock`, an HTTP endpoint SiYuan does not treat as an editing action, so **plugin writes never enter the stack**. Pressing `Ctrl+Z` undoes your own typing, not the plugin's rewrite — that is the real reason it felt like "nothing happened".
+
+So the plugin keeps its own stack:
+
+| | |
+|---|---|
+| What is stored | per run: which blocks changed, each block's before/after DOM, and the old values of `name` / `custom-xref` / `style` |
+| Depth | **10 runs** by default, adjustable 1–50 in settings |
+| Where | memory + `data/storage/petal/siyuan-xref/undo-stack.json`, survives a restart |
+| Keys | `Ctrl+Alt+Z` back one run, `Ctrl+Alt+Y` forward one |
+
+- Only blocks the plugin touched are rolled back. If you manually edited one of them in between, undo restores the older value — mind the timing
+- **Deleted blocks are rebuilt** (new in 1.0.2): SiYuan's `insertBlock` keeps the `data-node-id` written into the DOM, so the rebuilt block has the *exact same ID* as before deletion and every `((blockID "anchor"))` pointing at it reconnects automatically. `name` / `custom-xref` / centering / tint are restored too
+- A rebuilt block lands at the end of its original parent (super blocks and lists included), so you may want to drag it back to its old position
+- Blocks that never went through a renumber are not in the stack, so undo cannot rescue them (use SiYuan's own `Ctrl+Z`)
+- Undo does not re-trigger an automatic run (2.5 s quiet window)
 
 ## What it recognises
 
@@ -57,7 +78,9 @@ Settings live under **Settings → Marketplace → Downloaded → Figure & Equat
 | Labels | 图 / 表 / 式 | Caption prefixes; can be changed to Figure / Table / Eq |
 | Refresh references while renumbering | On | Off = only numbers change, existing references are left alone |
 | Auto renumber | On | Fires ~1.5 s after you stop typing; never writes into the block holding the caret |
-| Dead references | Convert to red struck-through text | See below |
+| Dead references | **Leave untouched** | See below. The "convert" mode waits 10 s before burning |
+| Undo depth | 10 | How many runs the plugin's own undo stack keeps (1–50) |
+| Restore dead references | — | Button: rewrites burnt references back to `((blockID))` |
 | Centre captions | On | Figure/table caption paragraphs are centred (equation blocks are already centred) |
 | Caption tint | Light | None / faint / light / light blue, semi-transparent so it works in dark themes too |
 | Custom hotkeys | Ctrl+Alt+R / Ctrl+Alt+N | See above |
@@ -67,17 +90,21 @@ Settings live under **Settings → Marketplace → Downloaded → Figure & Equat
 
 Numbers shift automatically within a few seconds and references follow. But SiYuan turns the reference into an orphan: the `((id "图 2"))` target is gone, leaving a stray `图 2` that keeps raising "block not found" and collides with the new numbering.
 
-Since v0.5.0 the default is to **convert it to plain text while keeping it visible as red + strikethrough** (`~~…~~` plus `color:var(--b3-font-color1)`, which normalises into a single `<span data-type="s" style="color:…">`):
+**Since 1.0.2 the default is "leave untouched"**: the reference is not modified at all — no red, no strikethrough. Delete a figure by mistake, press `Ctrl+Alt+Z`, and the plugin **rebuilds the deleted block with its original ID**, so the reference reconnects by itself. That is the real fix for "deleted a table, every reference broke, unrecoverable".
+
+This release also fixes dead-reference *detection*: SiYuan keeps the row in the `blocks` table for another 2–4 seconds after a block is deleted, and the old code decided liveness from that table — so right after a deletion it always reported "no dead references". 1.0.2 verifies liveness through the real-time endpoints `checkBlockExist` / `getBlockDOM` (measured: `false` within 0 ms of a delete), and drops leftover "ghost rows" from the collection result so they no longer hold on to numbering slots.
+
+- Why the red marking was dropped: it is a runtime CSS class — SiYuan drops it on every re-render and the plugin re-adds it, which reads as "the plugin broke my reference" (two reports on the day 1.0.1 shipped). Switch back to **Mark only** if you want the hint.
 
 ```
-after deleting the old 式 1
-  式 1  y = A×sin(x)          ← the former 式 2 moved up, numbering normal
-  见 式 2                      ← reference to the former 式 3, updated
-  见 ~~式 1~~ (red)            ← pointed at a deleted block, now plain text, no more errors
+after deleting the old 式 1, then undoing the deletion
+  式 1  y = A×sin(x)          ← block is back
+  见 式 2                      ← numbering synced
+  见 式 1 (red)                ← reference still there and clickable
 ```
 
-- Converting to text **loses the reference link** — that is exactly why the error disappears. The original markdown is kept in `data/storage/petal/siyuan-xref/dead-fix-log.json` (last 60 entries) in case you want to restore it by hand.
-- If you would rather keep the link, switch the setting to **Mark only**: it still turns red with a strikethrough but the reference survives, and it comes back if you undo the deletion.
+- If you really want it gone, switch **Dead references → Convert to red struck-through text**. That mode **waits 10 seconds** (`deadGrace`) before burning, so an undo within 10 s still saves it. Once burnt, the block ID is gone.
+- Every conversion is logged to `data/storage/petal/siyuan-xref/dead-fix-log.json` (last 60). The **"Restore in this document"** button in settings rewrites them back to `((blockID "anchor"))`, skipping targets that no longer exist.
 
 ## How it writes blocks (and why formulas survive)
 
@@ -119,7 +146,11 @@ Block order comes from one `getDoc` call: the order in which `data-node-id` appe
 - Works on the currently open document only; it does not span documents
 - Table blocks carry no number of their own; the caption paragraph above or below does
 - Renumbering rewrites block content, so extra entries appear in block history (rollback is possible there)
-- Automatic rewrites land on the undo stack: pressing `Ctrl+Z` right after typing may undo the plugin's change instead of your input. Turn auto off if that bothers you
+- **SiYuan's `Ctrl+Z` cannot undo plugin rewrites.** The plugin writes via `/api/block/updateBlock` (HTTP); SiYuan's undo stack only records editor-initiated operations, so API writes never enter it. Use `Ctrl+Alt+Z` instead (see "Undo and redo")
+- Plugin undo only rolls back blocks the plugin touched; manual edits made to those blocks in between are reverted too
+- Older versions defaulted to "convert to text", which burnt the `((blockID))` irretrievably. 1.0.2 defaults to "leave untouched"; anything already burnt can be recovered with the "Restore in this document" button
+- Undo only covers blocks the plugin itself rewrote
+- A rebuilt block lands at the end of its original parent; drag it back if the exact position matters
 - While the caret rests in a block that needs rewriting, the plugin waits — so "the number did not change while I was typing" is expected; move the caret and it applies
 - The plugin waits roughly 3 seconds after the last edit (`EDIT_GRACE`): a freshly typed block is not indexed yet and writing too early risks corrupting it. If that window is still not enough, the run gives up and retries automatically instead of silently doing nothing
 - Whenever an automatic run defers (equation editor open, still typing, index not caught up), it writes `giveup:<reason>` to `data/storage/petal/siyuan-xref/err-log.json` so you can see why nothing happened

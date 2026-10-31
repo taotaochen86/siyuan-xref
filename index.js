@@ -15,8 +15,15 @@ const DEFAULTS = {
     refreshRefs: true,
     autoMode: true,     // 写完停手 autoDelay 毫秒后自动重排
     autoDelay: 1500,
-    // 指向已删块的引用怎么处理：text 转成红色删除线文本（默认）| mark 只标红不改内容 | off 不查
-    deadRefAction: "text",
+    // 指向已删块的引用怎么处理：off 不看不标记（默认）| mark 只标红保留引用 | text 转成红色删除线文本
+    // 1.0.2 起默认改成 off：标红是运行时加的 class，思源一重渲染就掉、下一轮又加回来，
+    // 用户看到「红字+删除线」只会以为是插件把内容改坏了（2026-10-31 用户两次反馈）。
+    // 而且死链真正的解法是「撤销时把块重建回来」，不是把引用涂红。
+    deadRefAction: "off",
+    deadGrace: 10000,   // text 模式下死链要连续存在这么久才允许烧成文本，给撤销留窗口
+    undoSteps: 10,      // 插件自建撤销栈保留多少轮（思源撤销栈收不到 API 写入，只能自己记）
+    keyUndo: "Ctrl+Alt+Z",   // 撤销上次重排
+    keyRedo: "Ctrl+Alt+Y",   // 重做重排
     centerCaption: true, // 重排时把「图 N …」「表 N …」题注段落设为居中
     captionBg: "light",  // 题注底色：none / faint / light / blue
     // 自定义快捷键（空串 = 不绑定）。格式由 hotkeyFromEvent 统一生成：Ctrl+Alt+R
@@ -178,7 +185,7 @@ function docIdFromDom() {
 
 const REF_ANY = /\(\((\d{14}-[0-9a-z]{7})/g;
 
-/** 找出文档内指向「已不存在块」的引用（跨文档引用会再查一次 blocks 表确认） */
+/** 找出文档内指向「已不存在块」的引用（跨文档引用靠实时接口核实） */
 async function findDeadRefs(blocks) {
     const alive = new Set(blocks.map((b) => b.id));
     const cand = new Set();
@@ -191,12 +198,11 @@ async function findDeadRefs(blocks) {
     }
     if (!cand.size) return [];
     const ids = Array.from(cand);
-    // limit -1 必须加：思源 SQL 默认只回 64 行（truncated:true），
-    // 引用一多就会把「其实还活着」的块误判成已删，进而被转成纯文本，不可逆
-    const found = await sql("select id from blocks where id in (" +
-        ids.map((i) => "'" + i + "'").join(",") + ") limit -1");
-    const ok = new Set(found.map((r) => r.id));
-    return ids.filter((i) => !ok.has(i));
+    // 一律用实时接口核实，不再用 SQL 粗筛：
+    // SQL 说「有」可能是删除后 index 还没清的残影（实测留 2~4s），拿它当活块正是老 bug 的根。
+    // 候选集只包含「不在本文档块列表里」的 id（跨文档引用 + 残影），一般 0~5 个，成本可忽略。
+    const am = await aliveMap(ids);
+    return ids.filter((i) => am[i] === false); // null（判不出）按活着处理，绝不误杀
 }
 
 /* ---------- 诊断：内存留痕 + 失败落盘（复盘"Field [id] must not be null"这类内核报错用） ---------- */
@@ -258,6 +264,66 @@ async function api(path, payload) {
 }
 
 const sql = (stmt) => api("/api/query/sql", { stmt });
+
+/**
+ * 块到底还在不在？三级判据，优先用最实时的：
+ *   1) /api/block/checkBlockExist —— 实测删除后 0ms 就返回 false（真·实时）
+ *   2) /api/block/getBlockDOM    —— 实时读树，错误信息含 "block not found"
+ *   3) SQL blocks 表             —— 最不可靠（删除后行还要留 2~4s），只作最后兜底
+ * 返回 true 在 / false 确定不在 / null 判不出（调用方按「在」保守处理，绝不误杀）。
+ *
+ * ⚠ 不能只用 SQL 判存活：删块后 blocks 表 2~4s 内还留着行，这段时间它把已删块当活块。
+ *   1.0.2 之前 findDeadRefs 就栽在这里 ——「删了图，引用失效」永远检测不出来。
+ * 这里直接用 fetchSyncPost 而不是 api()：api() 会把 code!==0 记进 err-log 并抛异常，
+ * 而「块不存在」是正常业务结果，不该刷爆错误日志。
+ */
+async function isBlockAlive(id) {
+    if (!id) return false;
+    try {
+        const r = await fetchSyncPost("/api/block/checkBlockExist", { id: id });
+        if (r && r.code === 0 && typeof r.data === "boolean") return r.data;
+    } catch (e) { /* 老内核没这个接口 -> 往下走 */ }
+    try {
+        const r = await fetchSyncPost("/api/block/getBlockDOM", { id: id });
+        if (r && r.code === 0 && r.data && typeof r.data.dom === "string" && r.data.dom) return true;
+        const msg = String((r && r.msg) || "");
+        if (r && r.code !== 0 && /not\s*found|not\s*exist|不存在|not\s*a\s*block/i.test(msg)) return false;
+    } catch (e) { /* 网络/内核异常 -> SQL 兜底 */ }
+    try {
+        const rows = await sql("select id from blocks where id='" + id + "' limit -1");
+        return !!(rows && rows.length);
+    } catch (e) {
+        return null;
+    }
+}
+
+/** 批量核实存活：小并发跑，避免一条一条串行等（跨文档引用多时差别明显） */async function aliveMap(ids) {
+    const out = {};
+    const CONC = 8;
+    for (let i = 0; i < ids.length; i += CONC) {
+        const batch = ids.slice(i, i + CONC);
+        const res = await Promise.all(batch.map((id) => isBlockAlive(id)));
+        batch.forEach((id, k) => { out[id] = res[k]; });
+    }
+    return out;
+}
+
+/**
+ * 取自己的版本号，写进 load-check.json 供排查。
+ * 实测 3.8.9 里 onload 阶段 this.manifest 可能还取不到（旧版一直写成 "unknown"，
+ * 于是「本地装的到底是哪一版」根本没法确认），这里退回读静态 plugin.json。
+ */
+async function ownVersion(inst) {
+    try { if (inst && inst.manifest && inst.manifest.version) return inst.manifest.version; } catch (e) {}
+    let name = "siyuan-xref";
+    try { if (inst && inst.name) name = inst.name; } catch (e) {}
+    try {
+        const r = await fetch("/plugins/" + name + "/plugin.json", { cache: "no-store" });
+        const j = await r.json();
+        if (j && j.version) return j.version;
+    } catch (e) { /* Node 测试环境没有相对路径 fetch，忽略 */ }
+    return "unknown";
+}
 
 async function retry(fn, tries = 4, delay = 600) {
     let last;
@@ -362,15 +428,17 @@ async function collectOnce(docId) {
         if (b && b.type !== "d" && !got.has(id)) { got.add(id); out.push(b); }
     }
     if (!out.length && all.length) return await orderFromTree(docId, meta); // getDoc 整篇失败才退回老路
-    // HTML 里没出现的块（渲染节点缺失，实测 68 篇里 0 例）：补到末尾，宁可顺序略差也不漏块
+    // HTML 里没出现的块（渲染节点缺失，实测 68 篇里 0 例）：补到末尾，宁可顺序略差也不漏块。
+    // 打上 stale 标记：这些块多半是「SQL 里还留着、实际已删」的残影，
+    // collectBlocks 会把确认已死的剔掉，否则会连带污染编号和死链判定。
     if (out.length < all.length) {
-        for (const b of all) if (!got.has(b.id)) { got.add(b.id); out.push(b); }
+        for (const b of all) if (!got.has(b.id)) { got.add(b.id); out.push(b); b.stale = true; }
     }
     return out;
 }
 
 /** 连续两次采集结果一致才返回：刚保存的块 blocks 表索引会滞后，直接读会漏掉引用 */
-async function collectBlocks(docId) {
+async function collectRaw(docId) {
     let prev = null;
     for (let round = 0; round < 4; round++) {
         const cur = await collectOnce(docId);
@@ -381,6 +449,32 @@ async function collectBlocks(docId) {
         await sleep(300);
     }
     return await collectOnce(docId);
+}
+
+/**
+ * 剔掉「SQL 里还在、实际已删」的残影块。
+ * 不剔的后果（1.0.2 前的真 bug）：
+ *  - 死链：已删目标被算进 alive 集合 -> 「删了图，引用全部失效」检测不出来
+ *  - 编号：给已删的题注留号，写回时 tree not found
+ * 正常文档 stale 块数为 0，这条几乎零成本；有残影时也只对那几个块各问一次 getBlockDOM。
+ */
+async function dropStaleDead(blocks) {
+    if (!blocks || !blocks.length) return blocks;
+    let has = false;
+    for (const b of blocks) if (b.stale) { has = true; break; }
+    if (!has) return blocks;
+    const dead = new Set();
+    for (const b of blocks) {
+        if (!b.stale) continue;
+        if ((await isBlockAlive(b.id)) === false) dead.add(b.id);
+    }
+    if (!dead.size) return blocks;
+    return blocks.filter((b) => !dead.has(b.id));
+}
+
+/** 采集入口：老行为 + 残影剔除 */
+async function collectBlocks(docId) {
+    return await dropStaleDead(await collectRaw(docId));
 }
 
 /**
@@ -442,7 +536,7 @@ function pickChapterLevel(blocks) {
 
 function buildPlan(blocks, s, deadSet) {
     const dead = deadSet instanceof Set ? deadSet : new Set();
-    const act = s.deadRefAction || "text";
+    const act = s.deadRefAction || "off";
     const fixDead = act === "text" && dead.size > 0;
     const counters = { fig: 0, tab: 0, eq: 0 };
     const labelOf = { fig: s.figLabel, tab: s.tabLabel, eq: s.eqLabel };
@@ -520,11 +614,104 @@ function buildPlan(blocks, s, deadSet) {
     return { plan: plan, refs: refs, deadRefs: deadRefs };
 }
 
+/**
+ * 把一块「已经被删掉」的块按记录里的 DOM 原样插回去。
+ *
+ * 为什么值得专门做：思源 insertBlock 会**保留 DOM 里写死的 data-node-id**
+ * （2026-10-31 实测），所以重建出来的块 ID 和删除前一模一样，
+ * 指向它的 ((块ID "锚")) 会立刻自动接回 —— 这是「删了图/表还能救回来」的唯一办法。
+ *
+ * 安全前提：先确认它真的不存在，活着的一律不动（避免重复插入）。
+ */
+async function rebuildBlock(dom, id, pid, attrs) {
+    if (!dom || !id) return false;
+    // 存在性一律看 DOM，不看 SQL：blocks 表索引滞后实测可超 1.2s，
+    // 刚插进去就查会误判成「没插成功」，反过来也会把活块当成死的
+    const isAlive = async () => {
+        try {
+            const d = await api("/api/block/getBlockDOM", { id: id });
+            return !!(d && d.dom);
+        } catch (e) { return false; }
+    };
+    if (await isAlive()) return false;          // 还活着，不该重建
+    const parent = pid || docIdFromDom();
+    if (!parent) return false;
+    // 旧 DOM 里的 index / updated 是上次渲染的产物，带着会让块的排序时间和更新时间错乱
+    const clean = String(dom)
+        .replace(/\sdata-node-index="[^"]*"/g, "")
+        .replace(/\supdated="[^"]*"/g, "");
+    if (clean.indexOf('data-node-id="' + id + '"') < 0) return false;   // DOM 和 id 对不上就别乱插
+    try {
+        await api("/api/block/insertBlock", { dataType: "dom", data: clean, parentID: parent });
+    } catch (e) {
+        await logErr("rebuildBlock/insert", e);
+        return false;
+    }
+    // DOM 里没有 IAL（name / custom-xref / style 是 setBlockAttrs 单独写的），跟着一起补回去，
+    // 否则重建出来的题注没名字、没居中、下一轮识别不到它是个图
+    if (attrs && Object.keys(attrs).length) {
+        try { await api("/api/attr/setBlockAttrs", { id: id, attrs: attrs }); } catch (e) { await logErr("rebuildBlock/attrs", e); }
+    }
+    for (let i = 0; i < 6; i++) {
+        await sleep(250);
+        if (await isAlive()) return true;
+    }
+    return false;
+}
+
 /** IAL 里某属性是否已经等于目标值 */
 function ialHas(ial, key, val) {
     if (!ial) return false;
     const esc = String(val).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return new RegExp('(^|\\s)' + key + '="' + esc + '"').test(ial);
+}
+
+/** 取 IAL 里某个属性的当前值（没有就空串）——撤销时要把老值原样写回去 */
+function ialValue(ial, key) {
+    if (!ial) return "";
+    const m = new RegExp('(?:^|\\s)' + key + '="([^"]*)"').exec(ial);
+    return m ? m[1] : "";
+}
+
+/**
+ * 把烧成纯文本的引用改回 ((块ID "锚"))。
+ * 思源把 ~~<span style="color:…">锚</span>~~ 归一化后有三种落法，实测都得认：
+ *   ① kramdown： ~~锚~~{: style="color:var(--b3-font-color1)"}      ← getBlockKramdown 拿到的就是它
+ *   ② HTML：     <span data-type="s" style="color:…">锚</span>
+ *   ③ HTML：     ~~<span …>锚</span>~~
+ * 只认带 var(--b3-font-color1) 的那个，用户自己敲的删除线不碰。
+ * map 是「锚文本 -> 块ID」，锚文本取自出事前那份原文（dead-fix-log 的 from）。
+ */
+const DEAD_COLOR = "var(--b3-font-color1)";
+
+function restoreDeadInMd(md, map) {
+    let out = String(md || "");
+    const hit = (t) => {
+        const key = String(t).replace(/<[^>]+>/g, "").trim();
+        return map[key] ? '((' + map[key] + ' "' + key + '"))' : null;
+    };
+    // ① kramdown 形态（最常遇到）
+    out = out.replace(/~~([^~\n]+)~~\{:([^}]*)\}/g, (whole, t, ial) => {
+        if (ial.indexOf(DEAD_COLOR) < 0) return whole;
+        return hit(t) || whole;
+    });
+    // ② HTML span 形态
+    out = out.replace(/<span[^>]*data-type="s"[^>]*>([^<]*)<\/span>/g, (whole, t) => {
+        if (whole.indexOf(DEAD_COLOR) < 0) return whole;
+        return hit(t) || whole;
+    });
+    // ③ ~~<span…>锚</span>~~ 形态
+    out = out.replace(/~~<span[^>]*>([^<]*)<\/span>~~/g, (whole, t) => {
+        if (whole.indexOf(DEAD_COLOR) < 0) return whole;
+        return hit(t) || whole;
+    });
+    return out;
+}
+
+/** 数一下这次还原了几处：只比较删除线数量差，用户自己的删除线前后不变，不会误计 */
+function countRestored(before, after) {
+    const n = (s) => (String(s).match(/~~[^~\n]+~~/g) || []).length;
+    return Math.max(0, n(before) - n(after));
 }
 
 /** 取一个可用的 Lute：优先用当前编辑器自带的那个（配置与正文一致），其次 window.Lute */
@@ -579,27 +766,55 @@ function mergeBlockDom(curDom, builtDom) {
     return cur.outerHTML;
 }
 
+/** DOM 里有没有真实的行内块引用节点（不是字面文本） */
+function hasRefNode(dom) {
+    return /data-type="block-ref"/.test(String(dom || ""));
+}
+
 /**
  * 改块内容：优先 DOM 模式（保留 IAL），拿不到 Lute 才退回 markdown 模式。
  * 返回 true 表示走的是 DOM（属性安全），false 表示走了 md（IAL 已被清空，需要补写属性）。
+ * rec 传了就把「改前 / 改后」的 DOM 记进撤销记录，用户能一键退回。
  */
-async function updateContent(id, md, protyle) {
+async function updateContent(id, md, protyle, rec) {
     const lut = getLute(protyle);
     if (lut) {
         try {
             const cur = await api("/api/block/getBlockDOM", { id: id });
             const merged = mergeBlockDom(cur && cur.dom, lut.Md2BlockDOM(md));
             if (merged) {
+                // 防呆：原块里有可点的块引用、合并后却没了，说明这一版 Lute 把 ((id "锚"))
+                // 当成了字面文本。这种写入会把引用彻底毁掉（用户只能看到 ((2026… "图 1-1")），
+                // 宁可不写也不毁内容。2026-10-31 用户实测踩到过这个形态。
+                // 只在「原来有、现在没了」时拦：原来没有的情况交给思源自己判断
+                if (hasRefNode(cur && cur.dom) && !hasRefNode(merged)) {
+                    await logErr("updateContent/ref-lost",
+                        new Error("合并后引用节点丢失，已跳过写入 id=" + id));
+                    return true;
+                }
                 await retry(() => api("/api/block/updateBlock",
                     { id: id, dataType: "dom", data: merged }));
+                if (rec) rec.items.push({ id: id, before: (cur && cur.dom) || "", after: merged });
                 return true;
             }
         } catch (e) {
             await logErr("updateContent/dom", e);
         }
     }
+    // md 兜底会清空 IAL，改前那份 DOM 还得单独取一次，否则撤销时没有可回退的内容
+    let before0 = "";
+    if (rec) {
+        try { before0 = ((await api("/api/block/getBlockDOM", { id: id })) || {}).dom || ""; }
+        catch (e) { before0 = ""; }
+    }
     await retry(() => api("/api/block/updateBlock",
         { id: id, dataType: "markdown", data: md }));
+    if (rec && before0) {
+        try {
+            const after0 = ((await api("/api/block/getBlockDOM", { id: id })) || {}).dom || "";
+            if (after0) rec.items.push({ id: id, before: before0, after: after0 });
+        } catch (e) { /* 取不到就不记，撤销时跳过这块 */ }
+    }
     return false;
 }
 
@@ -612,7 +827,7 @@ async function updateContent(id, md, protyle) {
  *
  * 返回 true = 内容已是目标值或已写好；false = 空公式/不是数学块，没动。
  */
-async function updateMathTag(id, seq) {
+async function updateMathTag(id, seq, rec) {
     if (typeof DOMParser === "undefined") return false;
     const cur = await api("/api/block/getBlockDOM", { id: id });
     const dom = cur && cur.dom;
@@ -627,8 +842,10 @@ async function updateMathTag(id, seq) {
     const next = body + " \\tag{" + seq + "}";
     if (next === String(raw).trim()) return true;   // 已经是目标值，省一次写入
     root.setAttribute("data-content", next);
+    const out = root.outerHTML;
     await retry(() => api("/api/block/updateBlock",
-        { id: id, dataType: "dom", data: root.outerHTML }));
+        { id: id, dataType: "dom", data: out }));
+    if (rec) rec.items.push({ id: id, before: dom, after: out });
     return true;
 }
 
@@ -667,7 +884,7 @@ function centerStyle(ial) {
     return captionStyle(ial, { center: true });
 }
 
-async function applyPlan(plan, refs, skip, protyle) {
+async function applyPlan(plan, refs, skip, protyle, rec) {
     const miss = skip || new Set();
     // 只有走 md 兜底时 IAL 才会被清空，这些块稍后要全量补属性
     const wiped = new Set();
@@ -679,14 +896,14 @@ async function applyPlan(plan, refs, skip, protyle) {
         if (p.kind === "eq") {
             // 公式：只改 data-content 的 \tag，不重建块 —— 这是唯一不会丢公式正文的写法
             if (p.emptyEq) continue;                 // 空公式不编号
-            try { await updateMathTag(p.id, p.seq); } catch (e) { await logErr("applyPlan/math", e); }
+            try { await updateMathTag(p.id, p.seq, rec); } catch (e) { await logErr("applyPlan/math", e); }
             await sleep(120);
             continue;
         }
         // 内容没变就不写：避免每轮自动重排都重写全文、刷一堆历史记录
         if (p.newMd && p.newMd !== p.curMd) {
             if (looksLossy(p.curMd, p.newMd)) { lossy += 1; continue; }
-            const ok = await updateContent(p.id, p.newMd, protyle);
+            const ok = await updateContent(p.id, p.newMd, protyle, rec);
             if (!ok) wiped.add(p.id);
             await sleep(150);
         }
@@ -694,7 +911,7 @@ async function applyPlan(plan, refs, skip, protyle) {
     for (const r of refs) {
         if (miss.has(r.id)) continue;
         if (looksLossy(r.old || "", r.next || "")) { lossy += 1; continue; }
-        const ok = await updateContent(r.id, r.next, protyle);
+        const ok = await updateContent(r.id, r.next, protyle, rec);
         if (!ok) wiped.add(r.id);
         await sleep(150);
     }
@@ -711,7 +928,13 @@ async function applyPlan(plan, refs, skip, protyle) {
             if (styleOf(cur) !== want) attrs.style = want;
         }
         if (!Object.keys(attrs).length) continue;
+        // 撤销要能把属性还原：记下这三个键改之前的值（空串 = 原本没有，撤销时写空即删除）。
+        // 即使走 md 兜底（full=true，属性已被清空）也要从采集快照 p.ial 里取旧值，
+        // 否则撤销只能把属性写成空，name / custom-xref 就永久丢了
+        const old = {};
+        Object.keys(attrs).forEach((k) => { old[k] = ialValue(p.ial, k); });
         await retry(() => api("/api/attr/setBlockAttrs", { id: p.id, attrs: attrs }));
+        if (rec) rec.attrs.push({ id: p.id, before: old, after: attrs });
         await sleep(80);
     }
 }
@@ -866,12 +1089,24 @@ class SiYuanXref extends Plugin {
                 hotkey: "",
                 editorCallback: (protyle) => { this.fire("num", protyle, null); },
             });
+            this.addCommand({
+                langKey: "xrefUndo",
+                langText: "撤销上次重排",
+                hotkey: "",
+                editorCallback: () => { this.fire("undo", null, null); },
+            });
+            this.addCommand({
+                langKey: "xrefRedo",
+                langText: "重做重排",
+                hotkey: "",
+                editorCallback: () => { this.fire("redo", null, null); },
+            });
         } catch (e) { logErr("addCommand", e); }
         // 自检：onload 真跑通才写这个文件，排查"插件装了但不生效"用
         try {
             await this.saveData("load-check.json", {
                 loadedAt: new Date().toISOString(),
-                version: (this.manifest && this.manifest.version) || "unknown",
+                version: await ownVersion(this),
                 slash: ["xref", "xrefnum"],
                 auto: true,
             });
@@ -882,6 +1117,23 @@ class SiYuanXref extends Plugin {
         // 全局 fetch 探针**默认不装**：它会给思源每一个 /api/ 请求都 clone 响应、解析 JSON，
         // 长期挂着会白白拖慢整个应用。只在排查问题时（设置里打开「诊断日志」）才装。
         this.settings = Object.assign({}, DEFAULTS, (await this.loadData("settings.json")) || {});
+        // 1.0.1 一次性迁移：旧默认 text 会把 ((块ID)) 烧掉、块恢复也接不回来。
+        // 已经写在 settings.json 里的旧值不会自动变成新默认，所以这里强制改一次并打标记，
+        // 之后用户自己再选「转成文本」就不再干预
+        if (!this.settings.migrated101) {
+            if ((this.settings.deadRefAction || "text") === "text") this.settings.deadRefAction = "mark";
+            this.settings.migrated101 = true;
+            try { await this.saveData("settings.json", this.settings); } catch (e) {}
+        }
+        // 1.0.2 一次性迁移：标红（mark）看着像「插件把引用改坏了」，默认改成不标记。
+        // 想看的可以在设置里自己开回来，开过就不再干预
+        if (!this.settings.migrated102) {
+            if ((this.settings.deadRefAction || "mark") === "mark") this.settings.deadRefAction = "off";
+            this.settings.migrated102 = true;
+            try { await this.saveData("settings.json", this.settings); } catch (e) {}
+        }
+        // 撤销栈要跨重启保留：用户可能改完关掉思源才想起来要撤
+        await this.loadUndo();
         // 把补全默认值后的设置落盘，排查「设置项没生效」时能直接看文件
         try { await this.saveData("settings.json", this.settings); } catch (e) {}
         this.setting = new Setting({ confirmCallback: () => this.saveSettings() });
@@ -949,24 +1201,28 @@ class SiYuanXref extends Plugin {
         });
         this.setting.addItem({
             title: "失效引用怎么处理",
-            description: "指向已删块的引用：转成文本可消除思源「块不存在」报错；仅标红则保留引用，块恢复后自动复原",
+            description: "指向已删块的引用。默认「不处理」：引用原样留着，删块后按 Ctrl+Alt+Z 能把块重建回来、" +
+                "引用自动接回；「仅标红」会在正文里涂红加删除线（看着像内容被改坏）；" +
+                "「转成文本」会让引用彻底失效、无法还原，还会等 10 秒才动手",
             createActionElement: () => {
                 const sel = document.createElement("select");
                 sel.className = "b3-select fn__size200";
                 [
-                    ["text", "转成红色删除线文本（推荐）"],
+                    ["off", "不处理，保持原样（推荐）"],
                     ["mark", "仅标红，保留引用"],
-                    ["off", "不处理"],
+                    ["text", "转成红色删除线文本（不可逆）"],
                 ].forEach(([v, t]) => {
                     const o = document.createElement("option");
                     o.value = v;
                     o.textContent = t;
-                    if ((this.settings.deadRefAction || "text") === v) o.selected = true;
+                    if ((this.settings.deadRefAction || "off") === v) o.selected = true;
                     sel.appendChild(o);
                 });
                 sel.addEventListener("change", () => {
                     this.settings.deadRefAction = sel.value;
                     this.saveSettings();
+                    // 从标红切到「不处理」要立刻把已经涂上的红去掉，否则得等下一次编辑
+                    if (sel.value !== "mark") { this._deadIds = []; paintDead([]); }
                 });
                 return sel;
             },
@@ -1026,7 +1282,8 @@ class SiYuanXref extends Plugin {
                 box.style.flexDirection = "column";
                 box.style.rowGap = "6px";
                 box.style.width = "190px";
-                [["keyInsert", "插入交叉引用"], ["keyRenumber", "重排编号"]].forEach(([k, label]) => {
+                [["keyInsert", "插入交叉引用"], ["keyRenumber", "重排编号"],
+                 ["keyUndo", "撤销上次重排"], ["keyRedo", "重做"]].forEach(([k, label]) => {
                     const wrap = document.createElement("div");
                     wrap.style.display = "flex";
                     wrap.style.alignItems = "center";
@@ -1075,6 +1332,48 @@ class SiYuanXref extends Plugin {
                     box.appendChild(wrap);
                 });
                 return box;
+            },
+        });
+
+        this.setting.addItem({
+            title: "撤销步数",
+            description: "插件自己记多少轮重排可以撤回（1~50）。思源的 Ctrl+Z 撤不到插件写入，所以单独记一份",
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.className = "b3-text-field fn__size200";
+                inp.type = "number";
+                inp.min = "1";
+                inp.max = "50";
+                inp.value = String(this.settings.undoSteps || 10);
+                inp.addEventListener("change", () => {
+                    let v = parseInt(inp.value, 10);
+                    if (isNaN(v)) v = 10;
+                    v = Math.max(1, Math.min(50, v));
+                    inp.value = String(v);
+                    this.settings.undoSteps = v;
+                    this._undo = this._undo || [];
+                    while (this._undo.length > v) this._undo.shift();
+                    this.saveSettings();
+                });
+                return inp;
+            },
+        });
+
+        this.setting.addItem({
+            title: "还原失效引用",
+            description: "把以前被「转成文本」烧掉的引用改回 ((块ID \"锚\"))。目标块已删除的会自动跳过",
+            createActionElement: () => {
+                const btn = document.createElement("button");
+                btn.className = "b3-button b3-button--outline fn__size200";
+                btn.textContent = "还原当前文档";
+                btn.addEventListener("click", () => {
+                    btn.disabled = true;
+                    btn.textContent = "还原中…";
+                    this.restoreDeadRefs()
+                        .catch((e) => { logErr("restoreDead", e); })
+                        .finally(() => { btn.disabled = false; btn.textContent = "还原当前文档"; });
+                });
+                return btn;
             },
         });
 
@@ -1147,7 +1446,7 @@ class SiYuanXref extends Plugin {
             this.trace({ cmd: d.cmd, acts: acts, touched: touched });
             if (!touched) return;
             // 重渲染会把标红冲掉，每次改动后补一次（只有 mark 模式才有引用可标，text 模式别白跑）
-            if (this._deadIds && this._deadIds.length && (this.settings.deadRefAction || "text") === "mark") {
+            if (this._deadIds && this._deadIds.length && (this.settings.deadRefAction || "off") === "mark") {
                 clearTimeout(this._repaintTimer);
                 this._repaintTimer = setTimeout(() => { paintDead(this._deadIds); }, 400);
             }
@@ -1204,6 +1503,10 @@ class SiYuanXref extends Plugin {
             });
         } else if (act === "num") {
             this.renumber(p).catch((e) => { logErr("hotkey:num", e); });
+        } else if (act === "undo") {
+            this.undoLast().catch((e) => { logErr("hotkey:undo", e); });
+        } else if (act === "redo") {
+            this.redoLast().catch((e) => { logErr("hotkey:redo", e); });
         }
     }
 
@@ -1240,6 +1543,8 @@ class SiYuanXref extends Plugin {
         if (!s) return;                            // 没带修饰键，交给思源自己处理
         const a = this.settings.keyInsert || "";
         const b = this.settings.keyRenumber || "";
+        const u = this.settings.keyUndo || "";
+        const rd = this.settings.keyRedo || "";
         if (a && s === a) {
             ev.preventDefault();
             ev.stopPropagation();
@@ -1248,6 +1553,14 @@ class SiYuanXref extends Plugin {
             ev.preventDefault();
             ev.stopPropagation();
             this.fire("num", this.currentProtyle(), null);
+        } else if (u && s === u) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.fire("undo", null, null);
+        } else if (rd && s === rd) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.fire("redo", null, null);
         }
     }
 
@@ -1258,6 +1571,8 @@ class SiYuanXref extends Plugin {
             this._retryTimer = null;
             clearTimeout(this._paintTimer);
             clearTimeout(this._repaintTimer);
+            clearTimeout(this._deadTimer);
+            clearTimeout(this._undoSaveTimer);
             if (this._onHotkey) document.removeEventListener("keydown", this._onHotkey, true);
         } catch (e) { /* 卸载时清不掉也不影响主功能 */ }
         this._onHotkey = null;
@@ -1299,10 +1614,26 @@ class SiYuanXref extends Plugin {
             }
             // 先判死链：删除块后编号会顺延，旧引用会静默指向错误的公式，必须标出来
             let deadIds = [];
-            if ((this.settings.deadRefAction || "text") !== "off") {
+            const deadAct = this.settings.deadRefAction || "off";
+            if (deadAct !== "off") {
                 try { deadIds = await findDeadRefs(blocks); } catch (e) { deadIds = []; }
             }
-            const r = buildPlan(blocks, this.settings, new Set(deadIds));
+            // text 模式：死链要连续存在 deadGrace 毫秒才准烧成文本。
+            // 烧掉就是销毁 ((块ID))，用户撤销把块恢复回来也接不回去 —— 得留一段反应时间
+            let burnable = new Set();
+            if (deadAct === "text" && deadIds.length) {
+                const key = deadIds.slice().sort().join(",");
+                const pend = this._deadPending;
+                if (pend && pend.key === key && Date.now() - pend.at >= (this.settings.deadGrace || 10000)) {
+                    burnable = new Set(deadIds);
+                } else {
+                    if (!pend || pend.key !== key) this._deadPending = { key: key, at: Date.now() };
+                    this.armDeadGrace();     // 到点自己再跑一轮，不用等用户再敲字
+                }
+            } else {
+                this._deadPending = null;
+            }
+            const r = buildPlan(blocks, this.settings, burnable);
             if (!r.plan.length && !r.refs.length) {
                 if (!o.silent) showMessage("siyuan-xref：本文档没识别到图/表/公式", 4000);
                 // 自动轮空手而归，但刚刚确实有人在敲字 —— 多半是刚写的那一行还没进索引，
@@ -1368,7 +1699,15 @@ class SiYuanXref extends Plugin {
             // 自己写完的静默窗口：别把自己的写入当成用户编辑再触发一轮。
             // 上限 12s —— 100 个题注的文档按 n×200 算要 20s+，会让自动重排长时间瘫痪
             this._quietUntil = Date.now() + Math.min(4000 + r.plan.length * 200 + r.refs.length * 200, 12000);
-            await applyPlan(r.plan, r.refs, hot, protyle || this._lastProtyle);
+            // 整轮改动记成一条撤销记录：思源的撤销栈收不到 API 写入，只能自己记
+            const rec = { doc: docId, t: Date.now(), items: [], attrs: [] };
+            await applyPlan(r.plan, r.refs, hot, protyle || this._lastProtyle, rec);
+            // 记下每块的原父块：万一它之后被删，撤销时要按原父块重建（没这信息只能插到文末）
+            try {
+                const pids = new Map(blocks.map((b) => [b.id, b.parent_id]));
+                rec.items.forEach((it) => { it.pid = pids.get(it.id) || docId; });
+            } catch (e) { /* 补不到就退回用文档 ID */ }
+            this.pushUndo(rec);
             this._retryN = 0; // 这一轮真写进去了，重试链清零
             this.trace({ renumber: "applied", skipped: hot.size });
 
@@ -1416,7 +1755,7 @@ class SiYuanXref extends Plugin {
     /** 死链统一处理：记下、标红（仅 mark 模式）、同一批只提醒一次 */
     handleDead(deadIds) {
         this._deadIds = deadIds || [];
-        if ((this.settings.deadRefAction || "text") !== "mark") return; // text 模式已改成纯文本，没有引用可标
+        if ((this.settings.deadRefAction || "off") !== "mark") { paintDead([]); return; } // off/text 都不该有红标，顺手清掉
         paintDead(this._deadIds);
         const sig = this._deadIds.slice().sort().join(",");
         if (!this._deadIds.length) { this._deadSig = ""; return; }
@@ -1438,9 +1777,170 @@ class SiYuanXref extends Plugin {
         await this.saveData("dead-fix-log.json", log);
     }
 
+    /* ---------- 插件自建撤销栈 ----------
+     * 为什么不用思源自己的 Ctrl+Z：插件写块走 /api/block/updateBlock（HTTP），
+     * 而思源撤销栈只记前端 transaction() 发起的操作，API 写入根本不入栈。
+     * 所以只能自己存「改前 / 改后」，用命令撤回。
+     */
+    pushUndo(rec) {
+        if (!rec || (!rec.items.length && !rec.attrs.length)) return;
+        this._undo = this._undo || [];
+        this._undo.push(rec);
+        const cap = Math.max(1, parseInt(this.settings.undoSteps, 10) || 10);
+        while (this._undo.length > cap) this._undo.shift();
+        this._redo = [];
+        this.saveUndo();
+    }
+
+    saveUndo() {
+        clearTimeout(this._undoSaveTimer);
+        this._undoSaveTimer = setTimeout(() => {
+            try {
+                this.saveData("undo-stack.json", { stack: this._undo || [], redo: this._redo || [] });
+            } catch (e) { /* 落盘失败不影响内存里的栈 */ }
+        }, 800);
+    }
+
+    async loadUndo() {
+        try {
+            const d = await this.loadData("undo-stack.json");
+            this._undo = (d && Array.isArray(d.stack)) ? d.stack : [];
+            this._redo = (d && Array.isArray(d.redo)) ? d.redo : [];
+        } catch (e) { this._undo = []; this._redo = []; }
+    }
+
+    /** dir = "before" 撤销 / "after" 重做 */
+    async replay(rec, dir) {
+        let n = 0, miss = 0, rebuilt = 0;
+        const attrOf = new Map((rec.attrs || []).map((a) => [a.id, a]));
+        for (const it of (rec.items || []).slice().reverse()) {
+            const dom = it[dir];
+            if (!dom) continue;
+            try { await api("/api/block/updateBlock", { id: it.id, dataType: "dom", data: dom }); n++; }
+            catch (e) {
+                const msg = String((e && e.message) || e);
+                // 块已被删：不是「撤销失败」，而是要把块重建回来。重建成功 ID 不变，引用自动接回。
+                // 优先用 after（块被删那一刻的真实样子，带 name / 居中 / 底色），
+                // 没有才退回 before —— 重建的目的是「把块找回来」，不是「退回重排前」
+                if (/tree not found|not found/i.test(msg)) {
+                    const a = attrOf.get(it.id);
+                    if (await rebuildBlock(it.after || dom, it.id, it.pid || rec.doc, a ? a.after : null)) rebuilt++;
+                    else miss++;
+                } else {
+                    miss++;
+                }
+            }
+            await sleep(80);
+        }
+        for (const a of (rec.attrs || []).slice().reverse()) {
+            try { await api("/api/attr/setBlockAttrs", { id: a.id, attrs: a[dir] || {} }); n++; }
+            catch (e) { miss++; }
+            await sleep(60);
+        }
+        return { n: n, miss: miss, rebuilt: rebuilt };
+    }
+
+    async undoLast() {
+        this._undo = this._undo || [];
+        if (!this._undo.length) { showMessage("siyuan-xref：没有可撤销的重排记录", 4000); return; }
+        const rec = this._undo.pop();
+        this._quietUntil = Date.now() + 2500;   // 自己写回去的改动别被当成用户编辑再触发一轮
+        let r = { n: 0, miss: 0 };
+        try { r = await this.replay(rec, "before"); }
+        catch (e) { await logErr("undoLast", e); }
+        this._redo = this._redo || [];
+        this._redo.push(rec);
+        this.saveUndo();
+        const at = new Date(rec.t || Date.now());
+        const hh = ("0" + at.getHours()).slice(-2) + ":" + ("0" + at.getMinutes()).slice(-2);
+        showMessage("siyuan-xref：已撤销 " + hh + " 那轮重排（" + r.n + " 处" +
+            (r.rebuilt ? "，重建了 " + r.rebuilt + " 个已被删除的块" : "") +
+            (r.miss ? "，" + r.miss + " 处块已不存在" : "") + "），还剩 " + this._undo.length + " 步可撤", 7000);
+        this.auditAndPaint();
+    }
+
+    async redoLast() {
+        this._redo = this._redo || [];
+        if (!this._redo.length) { showMessage("siyuan-xref：没有可重做的重排记录", 4000); return; }
+        const rec = this._redo.pop();
+        this._quietUntil = Date.now() + 2500;
+        let r = { n: 0, miss: 0, rebuilt: 0 };
+        try { r = await this.replay(rec, "after"); } catch (e) { await logErr("redoLast", e); }
+        this._undo = this._undo || [];
+        this._undo.push(rec);
+        this.saveUndo();
+        showMessage("siyuan-xref：已重做，撤销栈 " + this._undo.length + " 步" +
+            (r.rebuilt ? "（重建 " + r.rebuilt + " 块）" : ""), 5000);
+        this.auditAndPaint();
+    }
+
+    /** text 模式：死链先挂 grace 秒再确认，到点自己跑一轮，不用等用户再敲字 */
+    armDeadGrace() {
+        if (this._deadTimer) return;
+        this._deadTimer = setTimeout(() => {
+            this._deadTimer = null;
+            if (!this._lastProtyle && !docIdFromDom()) return;
+            this.renumber(this._lastProtyle, { auto: true, silent: true })
+                .catch((e) => { logErr("deadGrace", e); });
+        }, (this.settings.deadGrace || 10000) + 500);
+    }
+
+    /** 把已烧成纯文本的引用改回 ((块ID "锚"))，数据来自 dead-fix-log.json */
+    async restoreDeadRefs() {
+        const docId = docIdFromDom() || getDocId(this._lastProtyle);
+        let log = [];
+        try { log = (await this.loadData("dead-fix-log.json")) || []; } catch (e) { log = []; }
+        if (!Array.isArray(log) || !log.length) {
+            showMessage("siyuan-xref：没有可还原的记录（dead-fix-log.json 为空）", 5000);
+            return;
+        }
+        const rows = docId ? log.filter((x) => x.doc === docId) : log;
+        if (!rows.length) {
+            showMessage("siyuan-xref：当前文档没有失效引用记录", 5000);
+            return;
+        }
+        const byBlock = new Map();
+        for (const x of rows) {
+            if (!byBlock.has(x.block)) byBlock.set(x.block, []);
+            byBlock.get(x.block).push(x);
+        }
+        let okB = 0, missB = 0, okRef = 0;
+        for (const [bid, items] of byBlock) {
+            const alive = await sql("select id from blocks where id = '" + bid + "' limit -1");
+            if (!alive.length) { missB++; continue; }   // 承载引用的段落没了，没法还原
+            let md = "";
+            try { md = ((await api("/api/block/getBlockKramdown", { id: bid })) || {}).kramdown || ""; }
+            catch (e) { md = ""; }
+            if (!md) { missB++; continue; }
+            const map = {};
+            for (const it of items) {
+                const re = /\(\((\d{14}-[0-9a-z]{7})\s+["'](.*?)["']\)\)/g;
+                let m;
+                while ((m = re.exec(String(it.from || "")))) { if (m[2]) map[m[2]] = m[1]; }
+            }
+            // 目标块本身还在吗？不在的话写回去只会再次变成死链，跳过
+            const targetGone = [];
+            for (const k of Object.keys(map)) {
+                const t = await sql("select id from blocks where id = '" + map[k] + "' limit -1");
+                if (!t.length) targetGone.push(k);
+            }
+            targetGone.forEach((k) => { delete map[k]; });
+            if (!Object.keys(map).length) { missB++; continue; }
+            const fixed = restoreDeadInMd(md, map);
+            if (fixed === md) continue;
+            okRef += countRestored(md, fixed);
+            try { await updateContent(bid, fixed, this._lastProtyle, null); okB++; }
+            catch (e) { missB++; }
+            await sleep(120);
+        }
+        showMessage("siyuan-xref：还原 " + okRef + " 处引用（" + okB + " 个块）" +
+            (missB ? "；" + missB + " 个块找不到或目标块已删" : ""), 9000);
+        this.auditAndPaint();
+    }
+
     /** 打开文档后：查一遍当前编辑器里的引用，把指向已删块的标红（仅 mark 模式） */
     async auditAndPaint() {
-        if ((this.settings.deadRefAction || "text") !== "mark") return;
+        if ((this.settings.deadRefAction || "off") !== "mark") { paintDead([]); return; }
         if (typeof document === "undefined") return;
         try {
             const ids = [];
@@ -1708,12 +2208,15 @@ class SiYuanXref extends Plugin {
 
 // 供本地离线测试使用（插件运行时不读这个字段）
 SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyPlan: applyPlan,
-    classify: classify, findDeadRefs: findDeadRefs, paintDead: paintDead,
+    classify: classify, findDeadRefs: findDeadRefs, paintDead: paintDead, rebuildBlock: rebuildBlock,
+    isBlockAlive: isBlockAlive, aliveMap: aliveMap, dropStaleDead: dropStaleDead, collectRaw: collectRaw,
+    ownVersion: ownVersion,
     slashRangeIn: slashRangeIn, restoreCaret: restoreCaret, getDocId: getDocId,
     findSlashBlock: findSlashBlock, mergeBlockDom: mergeBlockDom,
     updateContent: updateContent, centerStyle: centerStyle, getLute: getLute,
     updateMathTag: updateMathTag, looksLossy: looksLossy, mathEditing: mathEditing,
     currentEditingId: currentEditingId,
     captionStyle: captionStyle, captionBgOf: captionBgOf, styleOf: styleOf,
-    hotkeyFromEvent: hotkeyFromEvent, collectFresh: collectFresh, domTopIds: domTopIds };
+    hotkeyFromEvent: hotkeyFromEvent, collectFresh: collectFresh, domTopIds: domTopIds,
+    ialValue: ialValue, restoreDeadInMd: restoreDeadInMd, countRestored: countRestored };
 module.exports = SiYuanXref;

@@ -2,7 +2,7 @@
   "name": "siyuan-xref",
   "author": "陈涛涛 (Taotao Chen)",
   "url": "https://github.com/taotaochen86/siyuan-xref",
-  "version": "0.9.1",
+  "version": "1.0.2",
   "minAppVersion": "3.7.0",
   "backends": [
     "all"
@@ -17,8 +17,8 @@
     "zh-CN": "图表公式交叉引用"
   },
   "description": {
-    "default": "Auto-number figures, tables and equations, then refresh cross-references automatically about 1.5s after you stop typing. Captions are centered with a faint tint. Equation blocks are updated in place on data-content only, so formulas are never wiped; empty equations are skipped and the run is paused while a formula or code editor is focused and retried automatically right after. Dead references become red struck-through text. Slash command /xref inserts a live block reference; custom hotkeys supported.",
-    "zh-CN": "自动重排图、表、公式编号并同步刷新交叉引用；写完题注停手约 1.5 秒自动生效。图/表题注自动居中并加一层浅底色（深浅可调）。公式只改 data-content 上的编号，不重建块，公式正文绝不会丢；空公式不编号。正在输入公式或代码时整轮跳过并自动补一轮重试，不会一次被打断就再也不排。指向已删块的失效引用会转成红色删除线文本。编辑器内输入 /xref 插入引用。支持自定义快捷键（默认 Ctrl+Alt+R 插入引用、Ctrl+Alt+N 重排编号），设置面板里按键即可录制。长文档不再受 SQL 64 行上限影响，采集只走 2 次请求。"
+    "default": "Auto-number figures, tables and equations, then refresh cross-references about 1.5s after you stop typing. Captions are centered with a faint tint. Equation blocks are updated in place on data-content only, so formulas are never wiped. Deleted a figure or table by mistake? Ctrl+Alt+Z rebuilds the deleted blocks with their original block IDs, so every cross-reference reconnects on its own (dead references are no longer painted red or burnt to text by default). Built-in undo stack (Ctrl+Alt+Z / Ctrl+Alt+Y, 10 runs by default, survives restart) because SiYuan's own Ctrl+Z does not capture API writes. Slash command /xref inserts a live block reference; custom hotkeys supported.",
+    "zh-CN": "自动重排图、表、公式编号并同步刷新交叉引用；写完题注停手约 1.5 秒自动生效。图/表题注自动居中并加一层浅底色（深浅可调）。公式只改 data-content 上的编号，不重建块，公式正文绝不会丢；空公式不编号。正在输入公式或代码时整轮跳过并自动补一轮重试，不会一次被打断就再也不排。误删图/表后按 Ctrl+Alt+Z，插件会把删掉的块按原块 ID 重建回来，指向它的交叉引用自动接上（默认不再把死链涂红或转成文本）。插件自带撤销栈，Ctrl+Alt+Z 撤回上一轮重排、Ctrl+Alt+Y 重做，默认保留 10 轮、跨重启有效。编辑器内输入 /xref 插入引用。支持自定义快捷键。"
   },
   "readme": {
     "default": "README_en.md",
@@ -35,6 +35,15 @@
     "figure",
     "table",
     "equation",
-    "caption"
+    "caption",
+    "撤销",
+    "重做",
+    "undo",
+    "redo",
+    "失效引用",
+    "恢复",
+    "重建",
+    "recover",
+    "rebuild"
   ]
 }

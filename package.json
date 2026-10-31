@@ -1,6 +1,6 @@
 {
   "name": "siyuan-xref",
-  "version": "0.9.1",
+  "version": "1.0.2",
   "description": "Auto-number figures, tables and equations in SiYuan and keep cross-references in sync.",
   "license": "MIT",
   "author": "陈涛涛 (Taotao Chen)",
