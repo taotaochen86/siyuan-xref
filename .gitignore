@@ -1,0 +1,14 @@
+# 构建产物与本地备份，不进版本库
+package.zip
+dist/
+.bak/
+node_modules/
+
+# 系统与编辑器杂项
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.swp
+.vscode/
+.idea/

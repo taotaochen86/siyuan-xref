@@ -1,0 +1,1537 @@
+"use strict";
+/**
+ * siyuan-xref —— 思源笔记 图/表/公式 自动编号 + 交叉引用
+ * 手写 CommonJS 插件，无需构建。依赖 siyuan 3.7+ 的 protyleSlash / addCommand / fetchSyncPost。
+ */
+const { Plugin, Setting, showMessage, fetchSyncPost } = require("siyuan");
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const DEFAULTS = {
+    mode: "continuous", // continuous 全文连续 | chapter 按 h1 分章（图 1-1）
+    figLabel: "图",
+    tabLabel: "表",
+    eqLabel: "式",
+    refreshRefs: true,
+    autoMode: true,     // 写完停手 autoDelay 毫秒后自动重排
+    autoDelay: 1500,
+    // 指向已删块的引用怎么处理：text 转成红色删除线文本（默认）| mark 只标红不改内容 | off 不查
+    deadRefAction: "text",
+    centerCaption: true, // 重排时把「图 N …」「表 N …」题注段落设为居中
+    captionBg: "light",  // 题注底色：none / faint / light / blue
+    // 自定义快捷键（空串 = 不绑定）。格式由 hotkeyFromEvent 统一生成：Ctrl+Alt+R
+    debug: false,       // 诊断模式：装 fetch 探针 + 写 ws-log.json。默认关，别长期开着
+    keyInsert: "Ctrl+Alt+R",   // 插入交叉引用
+    keyRenumber: "Ctrl+Alt+N", // 重排图表编号
+};
+
+/**
+ * 键名归一表 + 组键函数。
+ * 录键（设置面板里按下组合键）和全局监听都用同一个函数生成字符串，
+ * 所以不需要再写解析逻辑，两边格式天然一致。
+ */
+const KEY_ALIAS = {
+    ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+    " ": "Space", Escape: "Esc", Delete: "Del", PageUp: "PgUp", PageDown: "PgDn",
+    Home: "Home", End: "End", Enter: "Enter", Tab: "Tab", "+": "Plus",
+};
+const ONLY_MOD = /^(Control|Alt|Shift|Meta|CapsLock|AltGraph)$/;
+
+function hotkeyFromEvent(ev) {
+    if (!ev) return "";
+    const raw = String(ev.key || "");
+    if (ONLY_MOD.test(raw)) return "";          // 只按下修饰键，还在途中
+    const parts = [];
+    if (ev.ctrlKey) parts.push("Ctrl");
+    if (ev.altKey) parts.push("Alt");
+    if (ev.shiftKey) parts.push("Shift");
+    if (ev.metaKey) parts.push("Meta");
+    if (!parts.length) return "";               // 必须带修饰键，否则打字会误触发
+    let k = raw;
+    if (!k || k === "Process" || k === "Unidentified") {
+        // 中文输入法/AltGr 下 ev.key 可能是 Process，退回物理键位
+        const c = String(ev.code || "");
+        if (/^Key[A-Z]$/.test(c)) k = c.slice(3);
+        else if (/^Digit\d$/.test(c)) k = c.slice(5);
+        else if (/^F\d{1,2}$/.test(c)) k = c;
+        else return "";
+    } else if (KEY_ALIAS[k]) {
+        k = KEY_ALIAS[k];                       // 空格、方向键、Esc 等先归一，别被下面的单字符分支吃掉
+    } else if (k.length === 1) {
+        k = k.toUpperCase();
+    } else {
+        k = k; // 其余保持原样（F5、Home 之类）
+    }
+    parts.push(k);
+    return parts.join("+");
+}
+
+/** 题注底色。用半透明灰，浅色主题下是浅灰、暗色主题下是浅一点的灰，都不会太重 */
+const CAPTION_BG = {
+    none: "",
+    faint: "rgba(127, 127, 127, 0.06)",
+    light: "rgba(127, 127, 127, 0.10)",
+    blue: "rgba(64, 130, 220, 0.08)",
+};
+
+function captionBgOf(s) {
+    const v = CAPTION_BG[s && s.captionBg];
+    return v === undefined ? CAPTION_BG.light : v;
+}
+
+/**
+ * 把失效引用降级成「红色 + 删除线」的普通文字。
+ * 思源对目标不存在的引用会一直报「未找到块」，转成纯文本就没这问题；
+ * 而 ~~…~~ 叠加 color 会被归一化成 <span data-type="s" style="color:var(--b3-font-color1)">，
+ * 删除线和红色都在一个元素上（实测 insertBlock 归一化结果）。
+ */
+function deadText(old) {
+    let t = String(old || "").trim() || "失效引用";
+    t = t.replace(/[<>{}~]/g, ""); // 防内联语法被撑破
+    return '~~<span data-type="text" style="color:var(--b3-font-color1)">' + t + "</span>~~";
+}
+
+/** 光标所在的块 ID（只在编辑器内算数，否则返回空串） */
+function currentEditingId() {
+    if (typeof document === "undefined") return "";
+    const pick = (node) => {
+        if (!node || !node.closest) return "";
+        const host = node.closest("[data-node-id]");
+        if (!host || !host.closest(".protyle-wysiwyg")) return "";
+        return host.getAttribute("data-node-id") || "";
+    };
+    const id = pick(document.activeElement);
+    if (id) return id;
+    // 公式 / 表格 / 块引用是浮层编辑，焦点可能落在 body 上，activeElement 拿不到块
+    const alt = document.querySelector(
+        ".protyle-wysiwyg .cm-editor.cm-focused, .protyle-wysiwyg .cm-content:focus, " +
+        ".protyle-util .cm-editor.cm-focused");
+    return pick(alt);
+}
+
+/** 数学公式编辑器是否正开着（用户在敲 LaTeX）。此时任何写回都会打断输入 */
+function mathEditing() {
+    if (typeof document === "undefined") return false;
+    const el = document.activeElement;
+    if (el && el.closest && el.closest(".protyle-math, .protyle-util")) {
+        if (el.closest(".cm-editor")) return true;
+    }
+    return !!document.querySelector(".protyle-math .cm-editor.cm-focused, .protyle-util .cm-editor.cm-focused");
+}
+
+/** 光标停着 != 正在打字：靠「该块最近 8 秒内被改过」来区分（敲公式有长停顿，留足余量） */
+const EDIT_GRACE = 8000;
+
+/** 兜底：事件没触发过时，从 DOM 里找当前打开的文档 ID（文档标题块带 data-node-id） */
+function docIdFromDom() {
+    if (typeof document === "undefined") return "";
+    const els = document.querySelectorAll(".protyle-title[data-node-id]");
+    for (let i = els.length - 1; i >= 0; i--) {
+        const id = els[i].getAttribute("data-node-id");
+        if (id && els[i].offsetParent !== null) return id;
+    }
+    return "";
+}
+
+const REF_ANY = /\(\((\d{14}-[0-9a-z]{7})/g;
+
+/** 找出文档内指向「已不存在块」的引用（跨文档引用会再查一次 blocks 表确认） */
+async function findDeadRefs(blocks) {
+    const alive = new Set(blocks.map((b) => b.id));
+    const cand = new Set();
+    for (const b of blocks) {
+        const md = b.markdown || "";
+        if (md.indexOf("((") < 0) continue;
+        REF_ANY.lastIndex = 0;
+        let m;
+        while ((m = REF_ANY.exec(md))) { if (!alive.has(m[1])) cand.add(m[1]); }
+    }
+    if (!cand.size) return [];
+    const ids = Array.from(cand);
+    // limit -1 必须加：思源 SQL 默认只回 64 行（truncated:true），
+    // 引用一多就会把「其实还活着」的块误判成已删，进而被转成纯文本，不可逆
+    const found = await sql("select id from blocks where id in (" +
+        ids.map((i) => "'" + i + "'").join(",") + ") limit -1");
+    const ok = new Set(found.map((r) => r.id));
+    return ids.filter((i) => !ok.has(i));
+}
+
+/* ---------- 诊断：内存留痕 + 失败落盘（复盘"Field [id] must not be null"这类内核报错用） ---------- */
+const CALLS = [];      // 最近 40 次 API 调用
+const ERRS = [];       // 最近 20 次失败
+let LOG_SINK = null;   // 由插件实例注入，负责写盘
+
+function callNote(path, pl) {
+    const brief = {};
+    try {
+        for (const k of Object.keys(pl || {})) {
+            const v = pl[k];
+            brief[k] = (typeof v === "string" && v.length > 80) ? v.slice(0, 80) + "…" : v;
+        }
+    } catch (e) {}
+    CALLS.push({ t: new Date().toISOString().slice(11, 23), path: path, pl: brief });
+    if (CALLS.length > 40) CALLS.shift();
+}
+
+async function logErr(where, e) {
+    try {
+        ERRS.push({
+            t: new Date().toISOString().slice(11, 23),
+            where: where,
+            msg: e && e.message ? e.message : String(e),
+            stack: e && e.stack ? String(e.stack).split("\n").slice(0, 4).join(" | ") : "",
+            calls: CALLS.slice(-12),
+        });
+        if (ERRS.length > 20) ERRS.shift();
+        if (LOG_SINK) await LOG_SINK(ERRS.slice());
+    } catch (err) {}
+}
+
+const ID_KEYS = ["id", "parentID", "previousID", "nextID"];
+
+async function api(path, payload) {
+    const pl = payload || {};
+    // 关键：id 为 null/空时内核会直接弹「Field [id] must not be null」，先拦住，换成能定位的本地错误
+    for (const k of ID_KEYS) {
+        if (k in pl && (pl[k] === null || pl[k] === undefined || pl[k] === "")) {
+            const e = new Error("本地拦截：" + path + " 的 " + k + " 为空（null/undefined/空串）");
+            e.__local = true;
+            await logErr(path, e);
+            throw e;
+        }
+    }
+    callNote(path, pl);
+    const r = await fetchSyncPost(path, pl);
+    if (r && r.truncated) {
+        // 思源 SQL 默认 64 行上限：静默截断比报错更危险，至少留痕
+        await logErr(path + " 结果被截断", new Error("SQL 结果被思源截断（limit=" + r.limit + "），请加 limit -1"));
+    }
+    if (r.code !== 0) {
+        const e = new Error(path + " -> " + r.msg);
+        await logErr(path, e);
+        throw e;
+    }
+    return r.data;
+}
+
+const sql = (stmt) => api("/api/query/sql", { stmt });
+
+async function retry(fn, tries = 4, delay = 600) {
+    let last;
+    for (let i = 0; i < tries; i++) {
+        try {
+            return await fn();
+        } catch (e) {
+            last = e;
+            await sleep(delay * (i + 1));
+        }
+    }
+    throw last;
+}
+
+const NUM_HEAD = /^\s*(图|表|Figure|Table)\s*(\d+(?:[-.]\d+)?)\s*/;
+
+/** 归类：custom-xref 属性优先；公式块=m→eq；段落前缀 图/表→fig/tab */
+function classify(b) {
+    const m = /custom-xref="([^"]*)"/.exec(b.ial || "");
+    if (m && ["fig", "tab", "eq"].indexOf(m[1]) >= 0) return m[1];
+    if (b.type === "m") return "eq";
+    const p = NUM_HEAD.exec((b.markdown || "").trim());
+    if (p) return p[1] === "图" || p[1] === "Figure" ? "fig" : "tab";
+    return null;
+}
+
+function stripNumber(kind, txt) {
+    let t = (txt || "").trim();
+    if (kind === "eq") {
+        t = t.replace(/^\$\$\s*/, "").replace(/\s*\$\$$/, "");
+        t = t.replace(/\\{1,2}tag\s*\{[^}]*\}/g, "");
+        return t.trim();
+    }
+    return t.replace(NUM_HEAD, "").trim();
+}
+
+/**
+ * 文档顺序：一次 getDoc 拿到整篇 HTML，块在 HTML 里出现的先后就是 DFS 先序。
+ * 实测 68 篇真实文档（2~348 块）与「逐块 getChildBlocks 递归」的顺序完全一致。
+ * 而后者是 O(n) 次往返：348 块的文档要 349 次、约 1.5 秒；这里 1 次、约 10 毫秒。
+ */
+async function orderFromDoc(docId) {
+    const doc = await api("/api/filetree/getDoc", { id: docId, size: 8 * 1024 * 1024 });
+    const html = (doc && doc.content) || "";
+    const re = /data-node-id="(\d{14}-[0-9a-z]{7})"/g;
+    const out = [];
+    const seen = new Set();
+    let m;
+    while ((m = re.exec(html))) {
+        const id = m[1];
+        if (!seen.has(id)) { seen.add(id); out.push(id); }
+    }
+    return out;
+}
+
+/** 兜底顺序：逐块 getChildBlocks 走 DFS。慢，只在 getDoc 整篇拿不到时用 */
+async function orderFromTree(docId, meta) {
+    const out = [];
+    const seen = new Set();
+    async function walk(pid) {
+        const kids = await api("/api/block/getChildBlocks", { id: pid });
+        for (const c of kids) {
+            if (seen.has(c.id)) continue;
+            seen.add(c.id);
+            if (meta[c.id] && meta[c.id].type !== "d") out.push(meta[c.id]);
+            await walk(c.id);
+        }
+    }
+    await walk(docId);
+    return out;
+}
+
+/** 单次采集：一条 SQL 拿全部块，一次 getDoc 定顺序 */
+async function collectOnce(docId) {
+    // blocks 表索引会滞后：刚建的块可能还查不到，问几次拿到就走
+    let rows = [];
+    // 只重试一次：collectBlocks 本身还要连采两轮比对，这里再死等就纯属浪费
+    for (let i = 0; i < 2; i++) {
+        rows = (await sql(
+            "select id,type,subtype,parent_id,markdown,name,ial from blocks " +
+            "where root_id='" + docId + "' limit -1" // limit -1：不加会被截到 64 行，长文档直接漏块
+        )) || [];
+        if (rows.length) break;
+        await sleep(400);
+    }
+    if (!rows.length) return [];
+
+    const meta = {};
+    const all = [];
+    rows.forEach((r) => {
+        meta[r.id] = r;
+        if (r.type !== "d" && r.id !== docId) all.push(r);
+    });
+
+    let order = [];
+    try { order = await orderFromDoc(docId); } catch (e) { order = []; }
+
+    const out = [];
+    const got = new Set();
+    for (const id of order) {
+        const b = meta[id];
+        if (b && b.type !== "d" && !got.has(id)) { got.add(id); out.push(b); }
+    }
+    if (!out.length && all.length) return await orderFromTree(docId, meta); // getDoc 整篇失败才退回老路
+    // HTML 里没出现的块（渲染节点缺失，实测 68 篇里 0 例）：补到末尾，宁可顺序略差也不漏块
+    if (out.length < all.length) {
+        for (const b of all) if (!got.has(b.id)) { got.add(b.id); out.push(b); }
+    }
+    return out;
+}
+
+/** 连续两次采集结果一致才返回：刚保存的块 blocks 表索引会滞后，直接读会漏掉引用 */
+async function collectBlocks(docId) {
+    let prev = null;
+    for (let round = 0; round < 4; round++) {
+        const cur = await collectOnce(docId);
+        const sig = cur.map((b) => b.id + ":" + (b.markdown || "").length).join("|");
+        if (prev === sig) return cur;
+        prev = sig;
+        if (!cur.length) return cur; // 空文档没必要再等一轮
+        await sleep(300);
+    }
+    return await collectOnce(docId);
+}
+
+/** 生成编号计划 + 需要刷新的引用 */
+/** 取文档里最浅的标题级别作为分章依据（h1 优先，没有 h1 就用 h2，以此类推） */
+function pickChapterLevel(blocks) {
+    let lv = 9;
+    for (const b of blocks) {
+        if (b.type === "h" && b.subtype) {
+            const n = parseInt(String(b.subtype).slice(1), 10);
+            if (!isNaN(n) && n < lv) lv = n;
+        }
+    }
+    return lv === 9 ? 0 : lv;
+}
+
+function buildPlan(blocks, s, deadSet) {
+    const dead = deadSet instanceof Set ? deadSet : new Set();
+    const act = s.deadRefAction || "text";
+    const fixDead = act === "text" && dead.size > 0;
+    const counters = { fig: 0, tab: 0, eq: 0 };
+    const labelOf = { fig: s.figLabel, tab: s.tabLabel, eq: s.eqLabel };
+    const chapLv = s.mode === "chapter" ? pickChapterLevel(blocks) : 0;
+    let chapter = 1;
+    let seenH1 = false;
+    const plan = [];
+    for (const b of blocks) {
+        if (chapLv && b.subtype === "h" + chapLv) {
+            if (seenH1) {
+                chapter += 1;
+                counters.fig = counters.tab = counters.eq = 0;
+            }
+            seenH1 = true;
+            continue;
+        }
+        const kind = classify(b);
+        if (!kind) continue;
+        counters[kind] += 1;
+        const seq = s.mode === "chapter" ? chapter + "-" + counters[kind] : String(counters[kind]);
+        const label = labelOf[kind];
+        const name = label + " " + seq;
+        const body = stripNumber(kind, b.markdown || "");
+        let newMd = null;
+        // 公式体为空时绝不写 tag：否则会造出 `$$\n\tag{1-4}\n$$` 这种只剩编号的坏块，
+        // 而且它是自维持的（下一轮 stripNumber 还是空），比不编号坏得多。
+        const emptyEq = kind === "eq" && !String(body).replace(/[\\{}\s]/g, "");
+        if (kind === "eq") {
+            newMd = emptyEq ? null : "$$\n" + body + " \\tag{" + seq + "}\n$$";
+        } else if (b.type !== "t") {
+            newMd = name + " " + body;
+        }
+        plan.push({ id: b.id, type: b.type, kind: kind, seq: seq, name: name, newMd: newMd,
+            emptyEq: emptyEq,
+            oldMd: (b.markdown || "").slice(0, 60),
+            curMd: b.markdown || "",   // 未截断的原内容，用来判断「真的需要重写吗」
+            ial: b.ial || "",
+            // 图/表题注默认居中 + 浅底色（公式块本身居中，不用设）
+            center: s.centerCaption !== false && (kind === "fig" || kind === "tab"),
+            bg: (kind === "fig" || kind === "tab") ? captionBgOf(s) : "" });
+    }
+    const anchor = {};
+    plan.forEach((p) => { anchor[p.id] = p.name; });
+    const refs = [];
+    const deadRefs = [];
+    if (s.refreshRefs || fixDead) {
+        const REF = /\(\((\d{14}-[0-9a-z]{7})\s+(["'])(.*?)\2\)\)/g;
+        for (const b of blocks) {
+            const md = b.markdown || "";
+            if (md.indexOf("((") < 0) continue;
+            let changed = false;
+            let fixedDead = 0;
+            const next = md.replace(REF, (whole, bid, q, old) => {
+                if (anchor[bid]) {
+                    if (!s.refreshRefs) return whole;
+                    if (anchor[bid] !== old) {
+                        changed = true;
+                        return "((" + bid + ' "' + anchor[bid] + '"))';
+                    }
+                    return whole;
+                }
+                if (fixDead && dead.has(bid)) {
+                    changed = true;
+                    fixedDead += 1;
+                    return deadText(old);
+                }
+                return whole;
+            });
+            if (changed) {
+                refs.push({ id: b.id, next: next, old: md.slice(0, 60) });
+                if (fixedDead) deadRefs.push({ id: b.id, from: md, to: next, n: fixedDead });
+            }
+        }
+    }
+    return { plan: plan, refs: refs, deadRefs: deadRefs };
+}
+
+/** IAL 里某属性是否已经等于目标值 */
+function ialHas(ial, key, val) {
+    if (!ial) return false;
+    const esc = String(val).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp('(^|\\s)' + key + '="' + esc + '"').test(ial);
+}
+
+/** 取一个可用的 Lute：优先用当前编辑器自带的那个（配置与正文一致），其次 window.Lute */
+let LUTE_ONCE = null; // 自建 Lute 只造一次：每改一个块新建一个纯属浪费
+
+function getLute(protyle) {
+    if (protyle && protyle.lute && typeof protyle.lute.Md2BlockDOM === "function") return protyle.lute;
+    if (LUTE_ONCE) return LUTE_ONCE;
+    try {
+        if (typeof window !== "undefined" && window.Lute && typeof window.Lute.New === "function") {
+            const l = window.Lute.New();
+            if (l && typeof l.Md2BlockDOM === "function") {
+                if (l.SetProtyleWYSIWYG) l.SetProtyleWYSIWYG(true);
+                if (l.SetKramdownIAL) l.SetKramdownIAL(true);
+                LUTE_ONCE = l;
+                return l;
+            }
+        }
+    } catch (e) { /* 拿不到就走 md 兜底 */ }
+    return null;
+}
+
+/**
+ * 把 Lute 新生成的块 DOM 的「内容」搬进当前块的根节点，根的属性原样保留。
+ * 关键：块的 IAL（name / style / custom-* / memo…）全部挂在根节点的 HTML 属性上，
+ * 只要根节点不换，属性就不会丢——这正是 markdown 模式做不到的。
+ * data-type / data-subtype / data-content / class 属于结构，必须跟着新内容走。
+ */
+function mergeBlockDom(curDom, builtDom) {
+    if (!curDom || !builtDom || typeof DOMParser === "undefined") return null;
+    const P = new DOMParser();
+    const curDoc = P.parseFromString(curDom, "text/html");
+    const newDoc = P.parseFromString(builtDom, "text/html");
+    const cur = curDoc.body.firstElementChild;
+    const nw = newDoc.body.firstElementChild;
+    if (!cur || !nw) return null;
+    // 类型变了（段落变列表之类）不硬套，交给 md 兜底
+    if ((cur.getAttribute("data-type") || "") !== (nw.getAttribute("data-type") || "")) return null;
+
+    ["data-type", "data-subtype", "data-content", "class"].forEach((k) => {
+        const v = nw.getAttribute(k);
+        if (v === null) cur.removeAttribute(k);
+        else cur.setAttribute(k, v);
+    });
+
+    const attrBox = cur.querySelector(":scope > .protyle-attr");
+    Array.from(cur.children).forEach((el) => { if (el !== attrBox) el.remove(); });
+    Array.from(nw.children).forEach((el) => {
+        if (el.classList && el.classList.contains("protyle-attr")) return;
+        cur.insertBefore(curDoc.adoptNode(el), attrBox || null);
+    });
+    return cur.outerHTML;
+}
+
+/**
+ * 改块内容：优先 DOM 模式（保留 IAL），拿不到 Lute 才退回 markdown 模式。
+ * 返回 true 表示走的是 DOM（属性安全），false 表示走了 md（IAL 已被清空，需要补写属性）。
+ */
+async function updateContent(id, md, protyle) {
+    const lut = getLute(protyle);
+    if (lut) {
+        try {
+            const cur = await api("/api/block/getBlockDOM", { id: id });
+            const merged = mergeBlockDom(cur && cur.dom, lut.Md2BlockDOM(md));
+            if (merged) {
+                await retry(() => api("/api/block/updateBlock",
+                    { id: id, dataType: "dom", data: merged }));
+                return true;
+            }
+        } catch (e) {
+            await logErr("updateContent/dom", e);
+        }
+    }
+    await retry(() => api("/api/block/updateBlock",
+        { id: id, dataType: "markdown", data: md }));
+    return false;
+}
+
+/**
+ * 数学块专用：只改根节点 data-content 上的 \tag，不经过 Lute、不动子节点。
+ *
+ * 为什么单独开这条路：数学公式的正文存在块根节点的 data-content 属性里（不在子节点内），
+ * 走 Md2BlockDOM + mergeBlockDom 时一旦 Lute 的 DOM 结构对不上，就会把 data-content 覆盖成空，
+ * 公式正文整个丢失、只剩 \tag。这里直接读当前 DOM 的真值来算，天生免疫 blocks 表索引滞后。
+ *
+ * 返回 true = 内容已是目标值或已写好；false = 空公式/不是数学块，没动。
+ */
+async function updateMathTag(id, seq) {
+    if (typeof DOMParser === "undefined") return false;
+    const cur = await api("/api/block/getBlockDOM", { id: id });
+    const dom = cur && cur.dom;
+    if (!dom) return false;
+    const root = new DOMParser().parseFromString(dom, "text/html").body.firstElementChild;
+    if (!root || root.getAttribute("data-type") !== "NodeMathBlock") return false;
+    const raw = root.getAttribute("data-content");
+    if (raw === null) return false;
+    const body = String(raw).replace(/\\{1,2}tag\s*\{[^}]*\}/g, "").trim();
+    // 只剩反斜杠/花括号/空白也算空：这类残留当正文写回去只会做脏块
+    if (!body.replace(/[\\{}\s]/g, "")) return false;  // 空公式：宁可不动，也不写只有一个 tag 的块
+    const next = body + " \\tag{" + seq + "}";
+    if (next === String(raw).trim()) return true;   // 已经是目标值，省一次写入
+    root.setAttribute("data-content", next);
+    await retry(() => api("/api/block/updateBlock",
+        { id: id, dataType: "dom", data: root.outerHTML }));
+    return true;
+}
+
+/**
+ * 防误写：新内容比旧内容短掉一半以上，基本是「采集到的是旧快照/半截内容」。
+ * 这种情况宁可不改，也不能用残缺内容覆盖用户刚写的东西。
+ */
+function looksLossy(oldMd, newMd) {
+    const a = String(oldMd || "").replace(/\s/g, "").length;
+    const b = String(newMd || "").replace(/\s/g, "").length;
+    if (a < 8) return false;
+    return b < a * 0.6;
+}
+
+/** 在已有 style 上补居中，别把用户自己设的颜色、缩进等冲掉 */
+/** 取出块 IAL 里的 style 声明串（没有就空串） */
+function styleOf(ial) {
+    const m = /\bstyle="([^"]*)"/.exec(ial || "");
+    return (m ? m[1] : "").trim();
+}
+
+function appendDecl(s, decl) {
+    return (s ? s.replace(/\s*;?\s*$/, "; ") : "") + decl;
+}
+
+/** 按需给题注补居中 / 背景，已有声明（颜色、缩进等）一律保留 */
+function captionStyle(ial, opt) {
+    let s = styleOf(ial);
+    if (opt.center && !/text-align\s*:\s*center/i.test(s)) s = appendDecl(s, "text-align: center;");
+    if (opt.bg && !/background-color\s*:/i.test(s)) s = appendDecl(s, "background-color: " + opt.bg + ";");
+    return s;
+}
+
+/** 兼容旧调用：只补居中 */
+function centerStyle(ial) {
+    return captionStyle(ial, { center: true });
+}
+
+async function applyPlan(plan, refs, skip, protyle) {
+    const miss = skip || new Set();
+    // 只有走 md 兜底时 IAL 才会被清空，这些块稍后要全量补属性
+    const wiped = new Set();
+    let lossy = 0;
+    // 第一轮：改内容。DOM 模式下 IAL 不受影响，所以顺序其实无所谓，
+    // 但兜底路径仍会把属性冲掉，属性补写在最后统一做最稳。
+    for (const p of plan) {
+        if (miss.has(p.id)) continue;
+        if (p.kind === "eq") {
+            // 公式：只改 data-content 的 \tag，不重建块 —— 这是唯一不会丢公式正文的写法
+            if (p.emptyEq) continue;                 // 空公式不编号
+            try { await updateMathTag(p.id, p.seq); } catch (e) { await logErr("applyPlan/math", e); }
+            await sleep(120);
+            continue;
+        }
+        // 内容没变就不写：避免每轮自动重排都重写全文、刷一堆历史记录
+        if (p.newMd && p.newMd !== p.curMd) {
+            if (looksLossy(p.curMd, p.newMd)) { lossy += 1; continue; }
+            const ok = await updateContent(p.id, p.newMd, protyle);
+            if (!ok) wiped.add(p.id);
+            await sleep(150);
+        }
+    }
+    for (const r of refs) {
+        if (miss.has(r.id)) continue;
+        if (looksLossy(r.old || "", r.next || "")) { lossy += 1; continue; }
+        const ok = await updateContent(r.id, r.next, protyle);
+        if (!ok) wiped.add(r.id);
+        await sleep(150);
+    }
+    // 第二轮：补属性。正常情况下 DOM 写入没动属性，这里只会补「本来就没有」的那几个。
+    for (const p of plan) {
+        if (miss.has(p.id)) continue;
+        const full = wiped.has(p.id);
+        const attrs = {};
+        if (full || !ialHas(p.ial, "name", p.name)) attrs.name = p.name;
+        if (full || !ialHas(p.ial, "custom-xref", p.kind)) attrs["custom-xref"] = p.kind;
+        if (p.center || p.bg) {
+            const cur = full ? "" : (p.ial || "");
+            const want = captionStyle(cur, { center: p.center, bg: p.bg });
+            if (styleOf(cur) !== want) attrs.style = want;
+        }
+        if (!Object.keys(attrs).length) continue;
+        await retry(() => api("/api/attr/setBlockAttrs", { id: p.id, attrs: attrs }));
+        await sleep(80);
+    }
+}
+
+/** callback 收到的是 Protyle 实例（.protyle 才是 IProtyle），两种都兼容；拿不到就退回查 DOM */
+function getDocId(p) {
+    const ip = p ? (p.protyle || p) : null;
+    const b = (ip && ip.block) || {};
+    const id = b.rootID || b.id || "";
+    if (id) return id;
+    return docIdFromDom();
+}
+
+/** 在当前块里找出 "/xxx" 触发文本的范围（斜杠面板关闭后选区会丢，得自己找回来） */
+function slashRangeIn(blockEl) {
+    if (!blockEl || !blockEl.querySelectorAll) return null;
+    const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT, null);
+    let node = null;
+    let best = null;
+    let bestIdx = -1;
+    while ((node = walker.nextNode())) {
+        const t = node.data || "";
+        const k = t.lastIndexOf("/");
+        if (k >= 0) { best = node; bestIdx = k; }
+    }
+    if (!best) return null;
+    const tail = best.data.slice(bestIdx + 1);
+    // "/xref" 这类触发串：短、无空白，否则不是斜杠命令残留
+    if (tail.length > 24 || /\s/.test(tail)) return null;
+    const r = document.createRange();
+    r.setStart(best, bestIdx);
+    r.setEnd(best, bestIdx + 1 + tail.length);
+    return r;
+}
+
+/**
+ * 把选区恢复到斜杠触发文本处，让 protyle.insert 插在正确位置。
+ * 斜杠菜单只调 callback(protyle, nodeEl)，既不删 /xref 也不恢复选区，
+ * 直接用 protyle.insert 会落到文档开头（实测过）。
+ */
+/** 终极兜底：扫可见编辑区，找文本以 "/xxx" 结尾的块（就是斜杠命令留下的那块） */
+function findSlashBlock() {
+    if (typeof document === "undefined") return "";
+    const wys = document.querySelectorAll(".protyle-wysiwyg");
+    for (let i = wys.length - 1; i >= 0; i--) {
+        if (wys[i].offsetParent === null) continue; // 跳过不可见编辑区
+        const els = wys[i].querySelectorAll("[data-node-id]");
+        for (let j = els.length - 1; j >= 0; j--) {
+            const t = (els[j].textContent || "").trim();
+            if (/\/[A-Za-z\u4e00-\u9fa5]{1,24}$/.test(t)) {
+                return els[j].getAttribute("data-node-id");
+            }
+        }
+    }
+    return "";
+}
+
+function restoreCaret(blockId) {
+    if (typeof document === "undefined") return false;
+    const id = blockId || findSlashBlock();
+    const blockEl = id
+        ? document.querySelector('.protyle-wysiwyg [data-node-id="' + id + '"]')
+        : null;
+    const sel = window.getSelection();
+    if (!sel) return false;
+    const r = slashRangeIn(blockEl);
+    sel.removeAllRanges();
+    if (r) {
+        sel.addRange(r); // 选中 "/xref"，insert 会替换掉它
+        return true;
+    }
+    if (blockEl) {
+        const rr = document.createRange();
+        rr.selectNodeContents(blockEl);
+        rr.collapse(false);
+        sel.addRange(rr);
+        return true;
+    }
+    return false;
+}
+
+function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** 给指向已删块的引用 span 加红：只在当前打开文档可见，导出靠锚文本里的〔已删除〕 */
+function paintDead(ids) {
+    if (typeof document === "undefined") return 0;
+    const set = new Set(ids || []);
+    let n = 0;
+    const spans = document.querySelectorAll('.protyle-wysiwyg span[data-type="block-ref"]');
+    for (const el of spans) {
+        const id = el.getAttribute("data-id") || "";
+        if (set.has(id)) { el.classList.add("xref-dead"); n++; }
+        else el.classList.remove("xref-dead");
+    }
+    return n;
+}
+
+class SiYuanXref extends Plugin {
+    /** 顶层保护：onload 抛异常会让思源把插件标成「加载失败」，这里一律吞掉并留痕 */
+    async onload() {
+        try {
+            await this.boot();
+        } catch (e) {
+            await logErr("onload", e);
+            try { console.error("[siyuan-xref] 加载失败", e); } catch (err) {}
+            showMessage("siyuan-xref 加载异常：" + (e && e.message ? e.message : e) +
+                "（详见 data/storage/petal/siyuan-xref/err-log.json）", 9000, "error");
+        }
+    }
+
+    async boot() {
+        // 先同步注册斜杠命令：onload 内后续有 await，避免打开文档时读不到
+        this.protyleSlash = [
+            {
+                id: "xref-ref",
+                filter: ["xref", "交叉引用", "图ref", "tref"],
+                html: '<div class="b3-list-item__first"><span class="b3-list-item__text">交叉引用</span>' +
+                    '<span class="b3-list-item__meta">图 / 表 / 式</span></div>',
+                showInLite: true,
+                callback: (protyle, nodeEl) => {
+                    this.openPicker(protyle, nodeEl).catch((e) => {
+                        logErr("slash:xref", e);
+                        showMessage("siyuan-xref 出错：" + (e && e.message ? e.message : e), 8000, "error");
+                    });
+                },
+            },
+            {
+                id: "xref-num",
+                filter: ["xrefnum", "重排编号", "图表编号"],
+                html: '<div class="b3-list-item__first"><span class="b3-list-item__text">重排图表编号</span>' +
+                    '<span class="b3-list-item__meta">同步刷新引用</span></div>',
+                showInLite: true,
+                callback: (protyle) => {
+                    this.renumber(protyle).catch((e) => { logErr("slash:xrefnum", e); });
+                },
+            },
+        ];
+        // 原生命令：注册后自动出现在「设置 → 快捷键 → 插件」里，可以在那里改键；
+        // 默认不占键位（hotkey 留空），实际快捷键由插件设置面板统一管理，避免两套键互撞。
+        try {
+            this.addCommand({
+                langKey: "xrefInsert",
+                langText: "插入交叉引用",
+                hotkey: "",
+                editorCallback: (protyle) => { this.fire("insert", protyle, null); },
+            });
+            this.addCommand({
+                langKey: "xrefRenumber",
+                langText: "重排图表编号",
+                hotkey: "",
+                editorCallback: (protyle) => { this.fire("num", protyle, null); },
+            });
+        } catch (e) { logErr("addCommand", e); }
+        // 自检：onload 真跑通才写这个文件，排查"插件装了但不生效"用
+        try {
+            await this.saveData("load-check.json", {
+                loadedAt: new Date().toISOString(),
+                version: (this.manifest && this.manifest.version) || "unknown",
+                slash: ["xref", "xrefnum"],
+                auto: true,
+            });
+        } catch (e) { /* 自检失败不影响主功能 */ }
+        // 失败留痕落到 data/storage/petal/siyuan-xref/err-log.json
+        LOG_SINK = async (arr) => { try { await this.saveData("err-log.json", arr); } catch (e) {} };
+
+        // 全局 fetch 探针**默认不装**：它会给思源每一个 /api/ 请求都 clone 响应、解析 JSON，
+        // 长期挂着会白白拖慢整个应用。只在排查问题时（设置里打开「诊断日志」）才装。
+        this.settings = Object.assign({}, DEFAULTS, (await this.loadData("settings.json")) || {});
+        // 把补全默认值后的设置落盘，排查「设置项没生效」时能直接看文件
+        try { await this.saveData("settings.json", this.settings); } catch (e) {}
+        this.setting = new Setting({ confirmCallback: () => this.saveSettings() });
+        this.setting.addItem({
+            title: "编号模式",
+            description: "全文连续（图 1、图 2）或按一级标题分章（图 1-1、图 2-1）",
+            createActionElement: () => {
+                const sel = document.createElement("select");
+                sel.className = "b3-select fn__size200";
+                [["continuous", "全文连续"], ["chapter", "按章编号"]].forEach(([v, t]) => {
+                    const o = document.createElement("option");
+                    o.value = v;
+                    o.textContent = t;
+                    if (this.settings.mode === v) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener("change", () => { this.settings.mode = sel.value; this.saveSettings(); });
+                return sel;
+            },
+        });
+        this.setting.addItem({
+            title: "图 / 表 / 式 标签",
+            description: "题注前缀文字，例如填 Figure / Table / Eq",
+            createActionElement: () => {
+                const box = document.createElement("div");
+                [["figLabel", "图"], ["tabLabel", "表"], ["eqLabel", "式"]].forEach(([k, ph]) => {
+                    const inp = document.createElement("input");
+                    inp.className = "b3-text-field fn__size80";
+                    inp.placeholder = ph;
+                    inp.value = this.settings[k];
+                    inp.style.marginRight = "4px";
+                    inp.addEventListener("change", () => { this.settings[k] = inp.value.trim() || ph; this.saveSettings(); });
+                    box.appendChild(inp);
+                });
+                return box;
+            },
+        });
+        this.setting.addItem({
+            title: "重排时同步刷新引用",
+            description: "把 ((块ID \"旧锚文本\")) 全部改成新编号。关闭后只改编号不动引用",
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = this.settings.refreshRefs;
+                inp.addEventListener("change", () => { this.settings.refreshRefs = inp.checked; this.saveSettings(); });
+                return inp;
+            },
+        });
+
+        this.setting.addItem({
+            title: "自动重排",
+            description: "写完题注停手 1.5 秒后自动重排编号并刷新引用。不会写入光标所在的块，避免打断输入",
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = this.settings.autoMode;
+                inp.addEventListener("change", () => {
+                    this.settings.autoMode = inp.checked;
+                    this.saveSettings();
+                });
+                return inp;
+            },
+        });
+        this.setting.addItem({
+            title: "失效引用怎么处理",
+            description: "指向已删块的引用：转成文本可消除思源「块不存在」报错；仅标红则保留引用，块恢复后自动复原",
+            createActionElement: () => {
+                const sel = document.createElement("select");
+                sel.className = "b3-select fn__size200";
+                [
+                    ["text", "转成红色删除线文本（推荐）"],
+                    ["mark", "仅标红，保留引用"],
+                    ["off", "不处理"],
+                ].forEach(([v, t]) => {
+                    const o = document.createElement("option");
+                    o.value = v;
+                    o.textContent = t;
+                    if ((this.settings.deadRefAction || "text") === v) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener("change", () => {
+                    this.settings.deadRefAction = sel.value;
+                    this.saveSettings();
+                });
+                return sel;
+            },
+        });
+
+        this.setting.addItem({
+            title: "题注居中",
+            description: "重排时把「图 N …」「表 N …」题注段落设为居中",
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = this.settings.centerCaption !== false;
+                inp.addEventListener("change", () => {
+                    this.settings.centerCaption = inp.checked;
+                    this.saveSettings();
+                });
+                return inp;
+            },
+        });
+
+        this.setting.addItem({
+            title: "题注底色",
+            description: "给「图 N …」「表 N …」题注加一层很淡的底色，暗色主题下也看得清；自己设过底色的不会被改",
+            createActionElement: () => {
+                const sel = document.createElement("select");
+                sel.className = "b3-select fn__size200";
+                [
+                    ["none", "无底色"],
+                    ["faint", "极浅"],
+                    ["light", "浅（默认）"],
+                    ["blue", "浅蓝"],
+                ].forEach(([v, t]) => {
+                    const o = document.createElement("option");
+                    o.value = v;
+                    o.textContent = t;
+                    if ((this.settings.captionBg || "light") === v) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener("change", () => {
+                    this.settings.captionBg = sel.value;
+                    this.saveSettings();
+                });
+                return sel;
+            },
+        });
+
+        // 自定义快捷键：点输入框后直接按组合键，录完立刻生效并落盘
+        this.setting.addItem({
+            title: "自定义快捷键",
+            description: "点一下输入框，再按下想用的组合键（必须带 Ctrl / Alt / ⌘）。Backspace 清空，Esc 取消。" +
+                "同时也会出现在「设置 → 快捷键 → 插件」里，两处改都行",
+            createActionElement: () => {
+                // 竖排两行：设置面板右侧这一栏窄，横着放开两个框会被裁掉
+                const box = document.createElement("div");
+                box.style.display = "flex";
+                box.style.flexDirection = "column";
+                box.style.rowGap = "6px";
+                box.style.width = "190px";
+                [["keyInsert", "插入交叉引用"], ["keyRenumber", "重排编号"]].forEach(([k, label]) => {
+                    const wrap = document.createElement("div");
+                    wrap.style.display = "flex";
+                    wrap.style.alignItems = "center";
+                    wrap.style.columnGap = "8px";
+                    const tip = document.createElement("span");
+                    tip.textContent = label;
+                    tip.style.fontSize = "12px";
+                    tip.style.opacity = "0.72";
+                    tip.style.whiteSpace = "nowrap";
+                    tip.style.flex = "0 0 auto";
+                    const inp = document.createElement("input");
+                    inp.className = "b3-text-field";
+                    inp.style.flex = "1 1 auto";
+                    inp.style.minWidth = "96px";
+                    inp.readOnly = true;
+                    inp.style.cursor = "pointer";
+                    inp.style.textAlign = "center";
+                    inp.placeholder = "未设置";
+                    inp.value = this.settings[k] || "";
+                    inp.title = "点击后按下组合键";
+                    inp.addEventListener("focus", () => { inp.value = ""; inp.placeholder = "请按组合键…"; });
+                    inp.addEventListener("blur", () => {
+                        inp.value = this.settings[k] || "";
+                        inp.placeholder = "未设置";
+                    });
+                    inp.addEventListener("keydown", (ev) => {
+                        // 录键期间拦住一切：别让 Ctrl+Alt+R 同时触发文档里的动作
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        if (ev.key === "Escape") { inp.blur(); return; }
+                        if (ev.key === "Backspace" || ev.key === "Delete") {
+                            this.settings[k] = "";
+                            inp.value = "";
+                            inp.placeholder = "未设置";
+                            this.saveSettings();
+                            return;
+                        }
+                        const s = hotkeyFromEvent(ev);
+                        if (!s) return; // 只按了修饰键
+                        this.settings[k] = s;
+                        inp.value = s;
+                        this.saveSettings();
+                    });
+                    wrap.appendChild(tip);
+                    wrap.appendChild(inp);
+                    box.appendChild(wrap);
+                });
+                return box;
+            },
+        });
+
+        // 诊断开关：默认关。开着会拦全局 fetch，长期开必然拖慢思源，排查完记得关掉
+        this.setting.addItem({
+            title: "诊断日志（排查用）",
+            description: "开启后会拦截全局网络请求并写 ws-log.json / err-log.json。**只在排查问题时开，平时请关闭**，会拖慢思源",
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = this.settings.debug === true;
+                inp.addEventListener("change", () => {
+                    this.settings.debug = inp.checked;
+                    this._debug = inp.checked;
+                    if (inp.checked) this.installFetchProbe(); // 打开才装，关掉要重载插件才卸（免得中途钩子断掉）
+                    this.saveSettings();
+                });
+                return inp;
+            },
+        });
+
+        this.bindHotkeys();
+        this._quietUntil = 0;
+        this._running = false;
+        this._editAt = {};
+        this._debug = this.settings.debug === true; // 排查时才开：会装 fetch 探针并写 ws-log.json
+        if (this._debug) this.installFetchProbe();
+        this._lastProtyle = null;
+        this._autoTimer = null;
+        this._paintTimer = null;
+        this._repaintTimer = null;
+        this._deadIds = [];
+        this._deadSig = "";
+        this._emptySig = "";
+
+        // 记住当前文档的 protyle，自动重排时用；顺手把已失效的引用标红
+        const remember = (e) => {
+            const p = (e && e.detail && e.detail.protyle) || null;
+            if (p) this._lastProtyle = p;
+            clearTimeout(this._paintTimer);
+            this._paintTimer = setTimeout(() => { this.auditAndPaint(); }, 800);
+        };
+        this.eventBus.on("switch-protyle", remember);
+        this.eventBus.on("loaded-protyle-static", remember);
+        this.eventBus.on("loaded-protyle-dynamic", remember);
+
+        // 文档事务 -> 防抖 -> 自动重排
+        this.eventBus.on("ws-main", (e) => {
+            const d = e && e.detail;
+            if (!d || d.cmd !== "transactions") return;
+            if (Date.now() < (this._quietUntil || 0)) return; // 自己刚写完，别自激
+            let touched = false;
+            const acts = this._debug ? [] : null; // 不在诊断模式就别攒这个数组了
+            try {
+                for (const tr of (d.data || [])) {
+                    for (const op of (tr.doOperations || [])) {
+                        const a = op && op.action;
+                        if (acts) acts.push(a);
+                        if (op && op.id) this.markEdit(op.id);
+                        if (a === "insert" || a === "update" || a === "delete" || a === "move") {
+                            touched = true;
+                        }
+                    }
+                }
+            } catch (err) { touched = false; }
+            this.trace({ cmd: d.cmd, acts: acts, touched: touched });
+            if (!touched) return;
+            // 重渲染会把标红冲掉，每次改动后补一次（只有 mark 模式才有引用可标，text 模式别白跑）
+            if (this._deadIds && this._deadIds.length && (this.settings.deadRefAction || "text") === "mark") {
+                clearTimeout(this._repaintTimer);
+                this._repaintTimer = setTimeout(() => { paintDead(this._deadIds); }, 400);
+            }
+            if (!this._lastProtyle && !docIdFromDom()) return;
+            if (!this.settings.autoMode) return;
+            clearTimeout(this._autoTimer);
+            this._autoTimer = setTimeout(() => { this.autoRun(); }, this.settings.autoDelay || 1500);
+        });
+    }
+
+    /**
+     * 诊断用：拦截所有 /api/ 失败请求（含思源自身与其他插件），记 URL、请求体、调用栈。
+     * 只在设置里打开「诊断日志」时才装 —— 它会 clone 每一个响应，长期开必然拖慢整个应用。
+     */
+    installFetchProbe() {
+        try {
+            if (typeof window === "undefined" || window.__xrefFetchHook) return;
+            window.__xrefFetchHook = true;
+            const raw = window.fetch.bind(window);
+            window.fetch = async function (input, init) {
+                let url = "";
+                try { url = typeof input === "string" ? input : (input && input.url) || ""; } catch (e) {}
+                const res = await raw(input, init);
+                if (url.indexOf("/api/") < 0) return res;
+                try {
+                    res.clone().json().then((d) => {
+                        if (!d || d.code === 0) return;
+                        let stack = "";
+                        try { stack = String(new Error().stack || "").split("\n").slice(1, 7).join(" | "); } catch (e) {}
+                        const body = String((init && init.body) || "").slice(0, 300);
+                        logErr("http " + url.replace(location.origin, "") + " body=" + body + " stack=" + stack,
+                            new Error(d.msg));
+                    }).catch(() => {});
+                } catch (e) { /* 探针自身出错不影响请求 */ }
+                return res;
+            };
+        } catch (e) { /* 挂钩失败不影响主功能 */ }
+    }
+
+    /**
+     * 统一的动作入口。快捷键、斜杠命令、原生命令都走这里，
+     * 顺便做 400ms 去重：原生快捷键和自己录的键撞车时只跑一次。
+     */
+    fire(act, protyle, nodeEl) {
+        const now = Date.now();
+        this._lastFire = this._lastFire || {};
+        if (now - (this._lastFire[act] || 0) < 400) return;
+        this._lastFire[act] = now;
+        const p = protyle || this.currentProtyle();
+        if (act === "insert") {
+            this.openPicker(p, nodeEl).catch((e) => {
+                logErr("hotkey:insert", e);
+                showMessage("siyuan-xref 出错：" + (e && e.message ? e.message : e), 8000, "error");
+            });
+        } else if (act === "num") {
+            this.renumber(p).catch((e) => { logErr("hotkey:num", e); });
+        }
+    }
+
+    /** 当前文档对应的 protyle；文档已经切换过就退回归零，免得把编号写到上一个文档 */
+    currentProtyle() {
+        const p = this._lastProtyle || null;
+        if (!p) return null;
+        try {
+            const domId = docIdFromDom();
+            const pid = getDocId(p);
+            if (domId && pid && domId !== pid) return null;
+        } catch (e) { /* 判断失败就用原值 */ }
+        return p;
+    }
+
+    /** 只装一次全局监听；DOM 上没有编辑器时按下键也不会误伤 */
+    bindHotkeys() {
+        if (typeof document === "undefined") return;
+        if (this._onHotkey) return;
+        this._onHotkey = (ev) => this.onHotkey(ev);
+        document.addEventListener("keydown", this._onHotkey, true);
+    }
+
+    onHotkey(ev) {
+        if (!ev || ev.repeat || ev.isComposing) return;
+        // 最先做最便宜的判断：没按修饰键就直接走人（正常打字全走这条路，零开销）
+        if (!ev.ctrlKey && !ev.altKey && !ev.metaKey) return;
+        const t = ev.target;
+        const tag = t && t.tagName ? String(t.tagName).toLowerCase() : "";
+        // 输入框、搜索框、设置面板、自己的选择面板里都不拦
+        if (tag === "input" || tag === "textarea" || tag === "select") return;
+        if (t && t.closest && t.closest(".b3-dialog, .xr-mask")) return;
+        const s = hotkeyFromEvent(ev);
+        if (!s) return;                            // 没带修饰键，交给思源自己处理
+        const a = this.settings.keyInsert || "";
+        const b = this.settings.keyRenumber || "";
+        if (a && s === a) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.fire("insert", this.currentProtyle(), null);
+        } else if (b && s === b) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.fire("num", this.currentProtyle(), null);
+        }
+    }
+
+    onunload() {
+        try {
+            clearTimeout(this._autoTimer);
+            clearTimeout(this._paintTimer);
+            clearTimeout(this._repaintTimer);
+            if (this._onHotkey) document.removeEventListener("keydown", this._onHotkey, true);
+        } catch (e) { /* 卸载时清不掉也不影响主功能 */ }
+        this._onHotkey = null;
+    }
+
+    async saveSettings() {
+        await this.saveData("settings.json", this.settings);
+        showMessage("siyuan-xref：设置已保存");
+    }
+
+    /**
+     * opts.auto  自动模式：绝不写入光标所在的块（打断输入），等光标离开再排
+     * opts.silent 成功不弹提示（自动模式用）
+     */
+    async renumber(protyle, opts) {
+        const o = opts || {};
+        // 重入保护：自动轮和手动轮同时跑会互相覆盖编号
+        if (this._running) {
+            if (!o.auto) showMessage("siyuan-xref：正在重排，请稍候再试", 3000);
+            return;
+        }
+        const docId = getDocId(protyle);
+        if (!docId) {
+            if (!o.silent) showMessage("siyuan-xref：未取到当前文档", 4000, "error");
+            return;
+        }
+        this._running = true;
+        try {
+            const blocks = await collectBlocks(docId);
+            this.trace({ renumber: "collected", doc: docId, n: blocks.length, auto: !!o.auto });
+            // 先判死链：删除块后编号会顺延，旧引用会静默指向错误的公式，必须标出来
+            let deadIds = [];
+            if ((this.settings.deadRefAction || "text") !== "off") {
+                try { deadIds = await findDeadRefs(blocks); } catch (e) { deadIds = []; }
+            }
+            const r = buildPlan(blocks, this.settings, new Set(deadIds));
+            if (!r.plan.length && !r.refs.length) {
+                if (!o.silent) showMessage("siyuan-xref：本文档没识别到图/表/公式", 4000);
+                this.handleDead(deadIds);
+                return;
+            }
+            this.trace({ renumber: "plan", plan: r.plan.length, refs: r.refs.length });
+            const need = new Set();
+            r.plan.forEach((p) => { if (p.newMd || p.name) need.add(p.id); });
+            r.refs.forEach((x) => need.add(x.id));
+
+            if (o.auto) {
+                // 公式编辑器开着 = 正在敲 LaTeX：这时候任何写回都会打断输入、把公式冲掉，
+                // 整轮直接放弃，等用户写完再说（这是「公式丢失」最主要的一条路径）
+                if (mathEditing()) {
+                    this.trace({ renumber: "giveup", why: "math-editing" });
+                    return;
+                }
+                // 光标停在待改块里：只有「刚改过这个块」才等，光标只是停着不算
+                // 最多等 EDIT_GRACE 那么久（12×800ms ≈ 9.6s），再久就说明人一直在写，这轮放弃
+                for (let i = 0; i < 12; i++) {
+                    const cur = currentEditingId();
+                    if (!cur || !need.has(cur)) break;
+                    const last = this._editAt[cur] || 0;
+                    if (Date.now() - last > EDIT_GRACE) break;
+                    await sleep(800);
+                }
+                const cur = currentEditingId();
+                const last = cur ? (this._editAt[cur] || 0) : 0;
+                if (cur && need.has(cur) && Date.now() - last <= EDIT_GRACE) {
+                    this.trace({ renumber: "giveup", cur: cur });
+                    return; // 人还在写，这轮放弃
+                }
+            }
+
+            // 刚改过的块，blocks 表索引可能还没跟上，采集到的是半截内容 —— 这类块一律不写
+            const hot = new Set();
+            if (o.auto) {
+                for (const id of need) {
+                    if (Date.now() - (this._editAt[id] || 0) <= EDIT_GRACE) hot.add(id);
+                }
+            }
+
+            // 自己写完的静默窗口：别把自己的写入当成用户编辑再触发一轮。
+            // 上限 12s —— 100 个题注的文档按 n×200 算要 20s+，会让自动重排长时间瘫痪
+            this._quietUntil = Date.now() + Math.min(4000 + r.plan.length * 200 + r.refs.length * 200, 12000);
+            await applyPlan(r.plan, r.refs, hot, protyle || this._lastProtyle);
+            this.trace({ renumber: "applied", skipped: hot.size });
+
+            // 已经坏掉的公式块（内容空、只剩 \tag）：插件不擅自改它，但要让用户知道
+            const emptyEqs = r.plan.filter((p) => p.emptyEq).map((p) => p.id);
+            if (emptyEqs.length && emptyEqs.join(",") !== this._emptySig) {
+                this._emptySig = emptyEqs.join(",");
+                showMessage("siyuan-xref：有 " + emptyEqs.length +
+                    " 个公式块内容为空（只剩 \\tag），请检查公式是否丢失", 9000, "error");
+            } else if (!emptyEqs.length) {
+                this._emptySig = "";
+            }
+
+            const dead = deadIds;
+            this.handleDead(deadIds);
+            if (r.deadRefs && r.deadRefs.length) {
+                // 转成文本是不可逆的，原文留一份，方便以后查/手工恢复
+                try {
+                    await this.archiveDead(docId, r.deadRefs);
+                } catch (e) { /* 归档失败不该影响正文 */ }
+            }
+            if (!o.silent) {
+                let msg = "siyuan-xref：已重排 " + r.plan.length + " 项，刷新引用 " + r.refs.length + " 处";
+                if (dead.length) {
+                    msg += (this.settings.deadRefAction === "text")
+                        ? "，另把 " + dead.length + " 处失效引用转成了红色删除线文本"
+                        : "，发现 " + dead.length + " 处失效引用";
+                }
+                showMessage(msg, 6000, dead.length ? "error" : "info");
+            }
+            this._lastDead = dead;
+        } catch (e) {
+            // 自动模式不弹窗，但错误要留痕，方便在控制台排查
+            try { console.error("[siyuan-xref]", e); } catch (err) {}
+            await logErr(o.auto ? "renumber:auto" : "renumber", e);
+            if (!o.silent) {
+                showMessage("siyuan-xref 出错：" + (e && e.message ? e.message : e), 8000, "error");
+            }
+        } finally {
+            this._running = false;
+            this._quietUntil = Math.max(this._quietUntil || 0, Date.now() + 2500);
+        }
+    }
+
+    /** 死链统一处理：记下、标红（仅 mark 模式）、同一批只提醒一次 */
+    handleDead(deadIds) {
+        this._deadIds = deadIds || [];
+        if ((this.settings.deadRefAction || "text") !== "mark") return; // text 模式已改成纯文本，没有引用可标
+        paintDead(this._deadIds);
+        const sig = this._deadIds.slice().sort().join(",");
+        if (!this._deadIds.length) { this._deadSig = ""; return; }
+        if (sig === this._deadSig) return;
+        this._deadSig = sig;
+        showMessage("siyuan-xref：" + this._deadIds.length + " 处交叉引用指向已删除的块，已在正文里标红", 7000, "error");
+    }
+
+    /** 失效引用被改成文本前，把原文存档（最近 60 条），万一要人工恢复能查 */
+    async archiveDead(docId, deadRefs) {
+        let log = [];
+        try { log = (await this.loadData("dead-fix-log.json")) || []; } catch (e) { log = []; }
+        if (!Array.isArray(log)) log = [];
+        const t = new Date().toISOString();
+        for (const d of deadRefs) {
+            log.push({ t: t, doc: docId, block: d.id, n: d.n, from: d.from, to: d.to });
+        }
+        while (log.length > 60) log.shift();
+        await this.saveData("dead-fix-log.json", log);
+    }
+
+    /** 打开文档后：查一遍当前编辑器里的引用，把指向已删块的标红（仅 mark 模式） */
+    async auditAndPaint() {
+        if ((this.settings.deadRefAction || "text") !== "mark") return;
+        if (typeof document === "undefined") return;
+        try {
+            const ids = [];
+            const seen = new Set();
+            const spans = document.querySelectorAll('.protyle-wysiwyg span[data-type="block-ref"][data-id]');
+            for (const el of spans) {
+                const id = el.getAttribute("data-id");
+                if (id && !seen.has(id)) { seen.add(id); ids.push(id); }
+            }
+            if (!ids.length) return;
+            const found = await sql("select id from blocks where id in (" +
+                ids.map((i) => "'" + i + "'").join(",") + ") limit -1");
+            const ok = new Set(found.map((r) => r.id));
+            this._deadIds = ids.filter((i) => !ok.has(i));
+            paintDead(this._deadIds);
+        } catch (e) { /* 审计失败不影响主功能 */ }
+    }
+
+    /** 自动模式入口：防抖后调用，重入保护 */
+    async autoRun() {
+        if (this._running || !this.settings.autoMode) return;
+        let p = this._lastProtyle;
+        if (!p || !getDocId(p)) {
+            const domId = docIdFromDom();
+            if (!domId) return;
+            p = { protyle: { block: { rootID: domId } } };
+        }
+        this.trace({ autoRun: "enter", doc: getDocId(p) });
+        await this.renumber(p, { auto: true, silent: true });
+        this.trace({ autoRun: "done" });
+    }
+
+    /** 记下「这个块刚被改过」。顺手做回收：长时间开着插件，_editAt 不该无限长 */
+    markEdit(id) {
+        const now = Date.now();
+        this._editAt[id] = now;
+        this._editN = (this._editN || 0) + 1;
+        if (this._editN % 200 === 0) {
+            for (const k of Object.keys(this._editAt)) {
+                if (now - this._editAt[k] > 60000) delete this._editAt[k];
+            }
+        }
+    }
+
+    /** 诊断留痕：只在排查时用，避免长期写盘 */
+    trace(obj) {
+        if (!this._debug) return;
+        try {
+            this._wsLog = this._wsLog || [];
+            obj.t = new Date().toISOString().slice(11, 23);
+            this._wsLog.push(obj);
+            if (this._wsLog.length > 40) this._wsLog.shift();
+            this.saveData("ws-log.json", this._wsLog).catch(() => {});
+        } catch (e) {}
+    }
+
+    async openPicker(protyle, nodeEl) {
+        // 记住光标所在的块：面板关闭后选区会丢，插入时必须靠它找回来
+        let anchorId = "";
+        let savedRange = null; // 快捷键触发时，原样恢复到按键瞬间的光标位置
+        try {
+            // 优先：斜杠菜单关闭瞬间选区还在 /xref 处
+            const sel = typeof window !== "undefined" ? window.getSelection() : null;
+            if (sel && sel.rangeCount) {
+                const r = sel.getRangeAt(0);
+                const n = r.startContainer;
+                const el = n && n.nodeType === 3 ? n.parentElement : n;
+                if (el && el.closest && el.closest(".protyle-wysiwyg")) savedRange = r.cloneRange();
+            }
+            if (sel && sel.anchorNode) {
+                const n = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+                const h = n && n.closest ? n.closest("[data-node-id]") : null;
+                if (h) anchorId = h.getAttribute("data-node-id");
+            }
+            // 次选：回调第二个参数通常是当前块元素
+            if (!anchorId && nodeEl && nodeEl.closest) {
+                const h2 = nodeEl.closest("[data-node-id]");
+                if (h2) anchorId = h2.getAttribute("data-node-id");
+            }
+        } catch (e) { anchorId = ""; }
+        const docId = getDocId(protyle);
+        if (!docId) {
+            await logErr("openPicker", new Error("未取到当前文档 ID，protyle=" +
+                (protyle ? Object.keys(protyle).slice(0, 12).join(",") : "null")));
+            showMessage("siyuan-xref：未取到当前文档", 4000, "error");
+            return;
+        }
+        let rows = [];
+        try {
+            rows = buildPlan(await collectBlocks(docId), this.settings).plan;
+        } catch (e) {
+            await logErr("openPicker:collect", e);
+            showMessage("siyuan-xref 读取失败：" + (e && e.message ? e.message : e), 8000, "error");
+            return;
+        }
+        if (!rows.length) { showMessage("siyuan-xref：本文档没识别到图/表/公式", 4000); return; }
+
+        const mask = document.createElement("div");
+        mask.className = "xr-mask";
+        const panel = document.createElement("div");
+        panel.className = "xr-panel";
+        const title = document.createElement("div");
+        title.className = "xr-title";
+        title.textContent = "插入交叉引用";
+        const input = document.createElement("input");
+        input.className = "b3-text-field xr-input";
+        input.placeholder = "搜索编号或题注，↑↓ 选择，回车插入，Esc 关闭";
+        const list = document.createElement("div");
+        list.className = "xr-list";
+        panel.appendChild(title);
+        panel.appendChild(input);
+        panel.appendChild(list);
+        mask.appendChild(panel);
+        document.body.appendChild(mask);
+        input.focus();
+
+        let items = rows.slice();
+        let cur = 0;
+        const render = () => {
+            list.innerHTML = "";
+            if (!items.length) {
+                const empty = document.createElement("div");
+                empty.className = "xr-empty";
+                empty.textContent = "没有匹配项";
+                list.appendChild(empty);
+                return;
+            }
+            items.forEach((x, i) => {
+                const it = document.createElement("div");
+                it.className = "xr-item" + (i === cur ? " xr-cur" : "");
+                it.innerHTML = '<span class="xr-name">' + esc(x.name) + "</span>" +
+                    '<span class="xr-preview">' + esc(x.oldMd.replace(/\n/g, " ").slice(0, 50)) + "</span>";
+                it.addEventListener("mousedown", (ev) => { ev.preventDefault(); pick(x); });
+                it.addEventListener("mousemove", () => {
+                    if (cur !== i) { cur = i; render(); }
+                });
+                list.appendChild(it);
+            });
+            const el = list.querySelector(".xr-cur");
+            if (el) el.scrollIntoView({ block: "nearest" });
+        };
+        const close = () => { mask.remove(); document.removeEventListener("keydown", onKey, true); };
+        const pick = (x) => {
+            const html = '<span data-type="block-ref" data-subtype="s" data-id="' + x.id + '">' +
+                esc(x.name) + "</span>";
+            close(); // 先关面板，否则焦点/选区都还在遮罩上
+            // 斜杠命令残留的 /xref 要整段选中替换；其余情况（快捷键触发）原样恢复光标
+            const anchorEl = anchorId
+                ? document.querySelector('.protyle-wysiwyg [data-node-id="' + anchorId + '"]')
+                : null;
+            let restored = false;
+            if (slashRangeIn(anchorEl)) {
+                restored = restoreCaret(anchorId);
+            } else if (savedRange) {
+                try {
+                    const sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(savedRange);
+                    restored = true;
+                } catch (e) { restored = false; }
+            }
+            if (!restored) restored = restoreCaret(anchorId);
+            if (!restored) {
+                // 宁可不插，也不能插到文档开头污染正文
+                showMessage("siyuan-xref：定位不到 /xref 所在位置，已取消插入。请把光标放到目标段落再试", 8000, "error");
+                return;
+            }
+            const runInsert = () => {
+                if (protyle && typeof protyle.insert === "function") {
+                    protyle.insert(html, false);
+                } else {
+                    document.execCommand("insertHTML", false, html);
+                }
+            };
+            try {
+                runInsert();
+            } catch (e) {
+                logErr("openPicker:insert", e);
+                try { document.execCommand("insertHTML", false, html); }
+                catch (e2) { showMessage("插入失败：" + (e && e.message ? e.message : e), 6000, "error"); return; }
+            }
+
+        };
+        const onKey = (ev) => {
+            if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); close(); return; }
+            if (ev.key === "ArrowDown") { ev.preventDefault(); cur = Math.min(cur + 1, items.length - 1); render(); return; }
+            if (ev.key === "ArrowUp") { ev.preventDefault(); cur = Math.max(cur - 1, 0); render(); return; }
+            if (ev.key === "Enter") {
+                ev.preventDefault(); ev.stopPropagation();
+                if (items[cur]) pick(items[cur]);
+                return;
+            }
+        };
+        document.addEventListener("keydown", onKey, true);
+        input.addEventListener("input", () => {
+            const q = input.value.trim().toLowerCase();
+            items = q ? rows.filter((x) => (x.name + " " + x.oldMd).toLowerCase().indexOf(q) >= 0) : rows.slice();
+            cur = 0;
+            render();
+        });
+        mask.addEventListener("mousedown", (ev) => { if (ev.target === mask) close(); });
+        render();
+    }
+}
+
+// 供本地离线测试使用（插件运行时不读这个字段）
+SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyPlan: applyPlan,
+    classify: classify, findDeadRefs: findDeadRefs, paintDead: paintDead,
+    slashRangeIn: slashRangeIn, restoreCaret: restoreCaret, getDocId: getDocId,
+    findSlashBlock: findSlashBlock, mergeBlockDom: mergeBlockDom,
+    updateContent: updateContent, centerStyle: centerStyle, getLute: getLute,
+    updateMathTag: updateMathTag, looksLossy: looksLossy, mathEditing: mathEditing,
+    currentEditingId: currentEditingId,
+    captionStyle: captionStyle, captionBgOf: captionBgOf, styleOf: styleOf,
+    hotkeyFromEvent: hotkeyFromEvent };
+module.exports = SiYuanXref;

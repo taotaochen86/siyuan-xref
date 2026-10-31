@@ -1,0 +1,87 @@
+/* siyuan-xref 引用选择器 —— 跟随思源主题变量，明暗自动适配 */
+.xr-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.xr-panel {
+  margin-top: 12vh;
+  width: 520px;
+  max-width: 88vw;
+  max-height: 64vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--b3-theme-background, #fff);
+  color: var(--b3-theme-on-background, #202124);
+  border: 1px solid var(--b3-border-color, #e0e0e0);
+  border-radius: var(--b3-border-radius-b, 8px);
+  box-shadow: var(--b3-dialog-shadow, 0 8px 32px rgba(0, 0, 0, 0.18));
+  overflow: hidden;
+}
+
+.xr-title {
+  padding: 10px 14px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--b3-theme-on-surface, #5f6368);
+}
+
+.xr-input {
+  margin: 0 14px 8px;
+  width: calc(100% - 28px);
+}
+
+.xr-list {
+  overflow-y: auto;
+  padding-bottom: 6px;
+}
+
+.xr-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.xr-item:hover,
+.xr-cur.xr-item {
+  background: var(--b3-theme-surface, #f2f3f5);
+}
+
+.xr-name {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--b3-theme-primary, #3573f0);
+  white-space: nowrap;
+}
+
+.xr-preview {
+  flex: 1 1 auto;
+  color: var(--b3-theme-on-surface, #5f6368);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xr-empty {
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--b3-theme-on-surface, #5f6368);
+}
+
+/* 指向已删块的引用：标红 + 删除线，一眼能看出失效 */
+.protyle-wysiwyg span[data-type="block-ref"].xref-dead,
+.protyle-wysiwyg span[data-type="block-ref"].xref-dead * {
+  color: var(--b3-theme-error, #d23f31) !important;
+  text-decoration: line-through !important;
+  text-decoration-thickness: 1px;
+  cursor: help;
+}

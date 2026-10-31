@@ -1,0 +1,33 @@
+name: Release
+
+# 推送 v* 标签即自动打包并挂出 Release（集市抓取的就是 Latest Release 里的 package.zip）
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 校验清单与脚本
+        run: npm run check
+
+      - name: 打包 package.zip
+        run: npm run build
+
+      - name: 创建 Release 并上传 package.zip
+        uses: softprops/action-gh-release@v2
+        with:
+          files: package.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true

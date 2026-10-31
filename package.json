@@ -1,0 +1,25 @@
+{
+  "name": "siyuan-xref",
+  "version": "0.9.0",
+  "description": "Auto-number figures, tables and equations in SiYuan and keep cross-references in sync.",
+  "license": "MIT",
+  "author": "陈涛涛 (Taotao Chen)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/taotaochen86/siyuan-xref.git"
+  },
+  "bugs": {
+    "url": "https://github.com/taotaochen86/siyuan-xref/issues"
+  },
+  "keywords": [
+    "siyuan",
+    "plugin",
+    "cross-reference",
+    "numbering"
+  ],
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "deploy": "bash scripts/deploy.sh",
+    "check": "node --check index.js && node -e \"JSON.parse(require('fs').readFileSync('plugin.json','utf8'));console.log('plugin.json OK')\""
+  }
+}
