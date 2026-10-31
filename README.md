@@ -158,14 +158,38 @@ HTML 属性上。`/api/block/updateBlock` 用 `dataType: "markdown"` 时会**拿
 
 ## 构建与发布（开发者）
 
+### 发版前必须改的信息
+
+| 项 | 位置 | 说明 |
+|---|---|---|
+| `version` | `plugin.json` **和** `package.json` | 两处都要改，只改一处会被 `preflight` 拦下 |
+| `url` | `plugin.json` | 必须是真实仓库地址，**不能留 `OWNER` 占位符** |
+| `description` | `plugin.json` 的 `default` 与 `zh-CN` | 把本次新增的能力写进去，两种语言同步 |
+| `displayName` / `keywords` | `plugin.json` | 有新功能就补关键词 |
+| `readme` 指向的文件 | `README.md` / `README_en.md` | 集市会把它们当详情页正文渲染 |
+| `minAppVersion` | `plugin.json` | 必须是思源真实存在的版本号 |
+
+`url` 尤其关键：集市详情页的**包名链接取 `repoURL`，作者链接取 `repoURL` 里的 owner**，`author` 字段只负责显示文字、不参与链接。写成 `OWNER` 会让两个链接同时 404。
+
+### 发版步骤
+
 ```bash
-npm run check            # 语法 + 清单校验
-npm run build            # 生成 package.zip（文件在 zip 根层，不套目录）
-npm run deploy           # 打包并解到本地思源 data/plugins/siyuan-xref
-GH_TOKEN=ghp_xxx npm run release   # 改版本号后打 Release，附件即 package.zip
+bash scripts/preflight.sh          # 体检：占位符 / url 一致性 / 版本 / zip 结构，不过就退出
+git add -A && git commit -m "release: vX.Y.Z" && git push origin main
+GH_TOKEN=ghp_xxx bash scripts/release.sh [发布说明.md]   # 内部会再跑一次 preflight
+bash scripts/deploy.sh             # 本地重装验证（必须在占位符替换之后）
 ```
 
-集市只认 GitHub **Latest Release** 里的 `package.zip`。以后发新版：改 `plugin.json` 的 `version` → 跑一次 `release`，索引会在一到三小时内自动更新，**不需要再提 PR**。
+其他命令：
+
+```bash
+npm run check    # 语法 + 清单校验
+npm run build    # 生成 package.zip（文件在 zip 根层，不套目录）
+npm run release  # 打 Release 并上传附件
+```
+
+集市只认 GitHub **Latest Release** 里的 `package.zip`。首次收录需向 `siyuan-note/bazaar` 提 PR 在 `plugins.txt` 追加一行；**之后每次更新只改 `version` 再发 Release 即可，不用再提 PR**，索引一到三小时内自动更新。
+
 
 ## 已知限制
 

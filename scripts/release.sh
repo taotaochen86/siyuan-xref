@@ -13,7 +13,19 @@ VER="$(node -p "require('./plugin.json').version")"
 TAG="v${VER}"
 NOTES_FILE="${1:-}"
 
-bash scripts/build.sh | head -1
+# 发版前体检：占位符、url 与仓库是否一致、版本号、zip 结构。任一不过直接退出。
+if ! bash scripts/preflight.sh; then
+    echo "发版中止：体检未通过（见上）。" >&2
+    exit 1
+fi
+
+# 版本号忘了改会撞 422；提前问清楚
+if curl -sSo /dev/null -m 30 -w "%{http_code}" \
+    -H "Authorization: token ${GH_TOKEN}" \
+    "https://api.github.com/repos/${REPO}/releases/tags/${TAG}" | grep -q "^200$"; then
+    echo "发版中止：${TAG} 已存在。改完 plugin.json 与 package.json 的 version 再来。" >&2
+    exit 1
+fi
 
 if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
     BODY="$(cat "$NOTES_FILE")"

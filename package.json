@@ -21,6 +21,7 @@
     "build": "bash scripts/build.sh",
     "deploy": "bash scripts/deploy.sh",
     "release": "bash scripts/release.sh",
-    "check": "node --check index.js && node -e \"JSON.parse(require('fs').readFileSync('plugin.json','utf8'));console.log('plugin.json OK')\""
+    "check": "node --check index.js && node -e \"JSON.parse(require('fs').readFileSync('plugin.json','utf8'));console.log('plugin.json OK')\"",
+    "preflight": "bash scripts/preflight.sh"
   }
 }
