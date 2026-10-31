@@ -109,18 +109,61 @@ function currentEditingId() {
     return pick(alt);
 }
 
-/** 数学公式编辑器是否正开着（用户在敲 LaTeX）。此时任何写回都会打断输入 */
+/**
+ * 用户是否正在编辑器里敲公式 / 代码。此时任何写回都会打断输入，甚至把内容冲掉。
+ *
+ * 判定依据：思源的公式、代码块都用 CodeMirror（.cm-editor）；正文 WYSIWYG 不是。
+ * 所以「可见且聚焦的 cm-editor」≈「正在改公式或代码」，这是唯一可靠的信号。
+ *
+ * 历史坑：旧版查 `.protyle-math` 这个类，而它在思源（3.8.9）里全局 0 处引用，
+ * 等于永远不会命中；反过来的 `.protyle-util` 又是通用浮层（搜索、块引用都往里放），
+ * 焦点类 `.cm-focused` 残留时会让判定恒为真 —— 自动重排被静默跳过，表现就是「没反应」。
+ * 现在两个方向都收紧：必须真的可见，且浮层里的编辑器也必须连着正文块。
+ */
 function mathEditing() {
     if (typeof document === "undefined") return false;
-    const el = document.activeElement;
-    if (el && el.closest && el.closest(".protyle-math, .protyle-util")) {
-        if (el.closest(".cm-editor")) return true;
+    try {
+        return mathEditingUnsafe();
+    } catch (e) {
+        return false; // 任何意外（残缺的 DOM 环境）都当没在编辑，别把整轮重排带崩
     }
-    return !!document.querySelector(".protyle-math .cm-editor.cm-focused, .protyle-util .cm-editor.cm-focused");
 }
 
-/** 光标停着 != 正在打字：靠「该块最近 8 秒内被改过」来区分（敲公式有长停顿，留足余量） */
-const EDIT_GRACE = 8000;
+function mathEditingUnsafe() {
+    const visible = (el) => {
+        if (!el || !el.isConnected) return false;
+        try {
+            if (typeof el.getClientRects === "function" && el.getClientRects().length === 0) return false;
+            const cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+            if (cs && (cs.display === "none" || cs.visibility === "hidden")) return false;
+        } catch (e) { /* 拿不到样式就当可见 */ }
+        return true;
+    };
+    // 1) 焦点所在的编辑器最可信
+    const ae = document.activeElement;
+    if (ae && ae.closest) {
+        const ed = ae.closest(".cm-editor");
+        if (ed && visible(ed)) return true;
+    }
+    // 2) 焦点可能因浮层/iframe 丢失，退一步找「带焦点类且看得见」的编辑器
+    const list = document.querySelectorAll(".cm-editor.cm-focused");
+    for (let i = 0; i < list.length; i++) {
+        if (visible(list[i])) return true;
+    }
+    return false;
+}
+
+/**
+ * 光标停着 != 正在打字：靠「该块最近 N 毫秒内被改过」来区分。
+ *
+ * 这个值直接决定「刚敲完的题注多久能被自动编号」：
+ *  - 太短：blocks 表索引还没跟上，读到的是半截内容，写回会把用户刚敲的字冲掉（数据丢失）
+ *  - 太长：题注被判定为「正在编辑」而整块跳过，表现就是「自动重排没反应」
+ * 实测（3.8.9，同一台机器）：`updateBlock` 写入后 SQL 可见耗时 0.59s / 1.50s，偶发 >1.8s。
+ * 取 3000ms：覆盖实测上限并留一倍余量，同时把「敲完等到编号」的等待压到 3 秒内。
+ * 万一还是慢，不会静默不管 —— 超时后放弃本轮并自动重试。
+ */
+const EDIT_GRACE = 3000;
 
 /** 兜底：事件没触发过时，从 DOM 里找当前打开的文档 ID（文档标题块带 data-node-id） */
 function docIdFromDom() {
@@ -338,6 +381,50 @@ async function collectBlocks(docId) {
         await sleep(300);
     }
     return await collectOnce(docId);
+}
+
+/**
+ * 页面上真实存在的一级块 id（编辑器渲染结果，就是 ground truth）。
+ * 用于校验 SQL 快照是否已经跟上 —— blocks 表延迟实测可达 2s+，
+ * 刚敲出来的题注如果还没进索引，采集结果里根本没有它，
+ * 计划自然是空的，于是「自动重排毫无反应」。只比一级块，够用且便宜。
+ */
+function domTopIds(protyle) {
+    try {
+        const ip = protyle ? (protyle.protyle || protyle) : null;
+        const el = ip && ip.wysiwyg && ip.wysiwyg.element;
+        if (!el || !el.children) return null;
+        const out = [];
+        for (let i = 0; i < el.children.length; i++) {
+            const c = el.children[i];
+            const id = c && c.getAttribute ? c.getAttribute("data-node-id") : "";
+            if (id) out.push(id);
+        }
+        return out.length ? out : null;
+    } catch (e) {
+        return null; // 拿不到 DOM 就不做校验，退回纯 SQL 行为
+    }
+}
+
+/**
+ * 采集 + 用页面校验新鲜度。返回 { blocks, stale }：
+ * stale=true 表示等了几轮，页面上还是有一级块不在快照里（索引没跟上）。
+ */
+async function collectFresh(docId, protyle) {
+    let blocks = await collectBlocks(docId);
+    const want = domTopIds(protyle);
+    if (!want) return { blocks: blocks, stale: false };
+    let stale = false;
+    for (let i = 0; i < 4; i++) {
+        const have = new Set(blocks.map((b) => b.id));
+        let missing = 0;
+        for (const id of want) if (!have.has(id)) missing++;
+        if (!missing) return { blocks: blocks, stale: false };
+        stale = true;
+        await sleep(400);
+        blocks = await collectBlocks(docId);
+    }
+    return { blocks: blocks, stale: stale };
 }
 
 /** 生成编号计划 + 需要刷新的引用 */
@@ -1018,6 +1105,9 @@ class SiYuanXref extends Plugin {
         if (this._debug) this.installFetchProbe();
         this._lastProtyle = null;
         this._autoTimer = null;
+        this._retryTimer = null;
+        this._retryN = 0;
+        this._giveupAt = {};
         this._paintTimer = null;
         this._repaintTimer = null;
         this._deadIds = [];
@@ -1164,6 +1254,8 @@ class SiYuanXref extends Plugin {
     onunload() {
         try {
             clearTimeout(this._autoTimer);
+            clearTimeout(this._retryTimer);
+            this._retryTimer = null;
             clearTimeout(this._paintTimer);
             clearTimeout(this._repaintTimer);
             if (this._onHotkey) document.removeEventListener("keydown", this._onHotkey, true);
@@ -1194,8 +1286,17 @@ class SiYuanXref extends Plugin {
         }
         this._running = true;
         try {
-            const blocks = await collectBlocks(docId);
-            this.trace({ renumber: "collected", doc: docId, n: blocks.length, auto: !!o.auto });
+            const got = await collectFresh(docId, protyle || this._lastProtyle);
+            const blocks = got.blocks;
+            this.trace({ renumber: "collected", doc: docId, n: blocks.length, stale: got.stale, auto: !!o.auto });
+            // 页面上有块、快照里没有 = blocks 表索引还没跟上。这时候排出来的编号一定是错的
+            // （新题注根本没参与编号，旧编号也不会顺延），只能等下一轮
+            if (got.stale && o.auto) {
+                this.trace({ renumber: "giveup", why: "index-lag" });
+                this.noteGiveup("index-lag", docId);
+                this.scheduleRetry();
+                return;
+            }
             // 先判死链：删除块后编号会顺延，旧引用会静默指向错误的公式，必须标出来
             let deadIds = [];
             if ((this.settings.deadRefAction || "text") !== "off") {
@@ -1204,6 +1305,13 @@ class SiYuanXref extends Plugin {
             const r = buildPlan(blocks, this.settings, new Set(deadIds));
             if (!r.plan.length && !r.refs.length) {
                 if (!o.silent) showMessage("siyuan-xref：本文档没识别到图/表/公式", 4000);
+                // 自动轮空手而归，但刚刚确实有人在敲字 —— 多半是刚写的那一行还没进索引，
+                // 或者正写一半。别就当没事发生，稍后补一轮
+                if (o.auto && this.hasFreshEdit()) {
+                    this.trace({ renumber: "giveup", why: "nothing-yet" });
+                    this.noteGiveup("nothing-yet", docId);
+                    this.scheduleRetry();
+                }
                 this.handleDead(deadIds);
                 return;
             }
@@ -1213,34 +1321,47 @@ class SiYuanXref extends Plugin {
             r.refs.forEach((x) => need.add(x.id));
 
             if (o.auto) {
-                // 公式编辑器开着 = 正在敲 LaTeX：这时候任何写回都会打断输入、把公式冲掉，
-                // 整轮直接放弃，等用户写完再说（这是「公式丢失」最主要的一条路径）
+                // 公式/代码编辑器开着 = 正在敲 LaTeX：这时候任何写回都会打断输入、把公式冲掉，
+                // 整轮放弃，等用户写完再说（这是「公式丢失」最主要的一条路径）。
+                // 放弃不等于终结 —— 挂一个重试，否则用户写完公式就再也不自动编号了
                 if (mathEditing()) {
                     this.trace({ renumber: "giveup", why: "math-editing" });
+                    this.noteGiveup("math-editing", docId);
+                    this.scheduleRetry();
                     return;
                 }
-                // 光标停在待改块里：只有「刚改过这个块」才等，光标只是停着不算
-                // 最多等 EDIT_GRACE 那么久（12×800ms ≈ 9.6s），再久就说明人一直在写，这轮放弃
-                for (let i = 0; i < 12; i++) {
+                // 光标停在待改块里：只有「刚改过这个块」才等，光标只是停着不算。
+                // 最多等到 EDIT_GRACE 之后，再久就说明人一直在写，这轮放弃（同样挂重试）
+                for (let i = 0; i < 8; i++) {
                     const cur = currentEditingId();
                     if (!cur || !need.has(cur)) break;
-                    const last = this._editAt[cur] || 0;
-                    if (Date.now() - last > EDIT_GRACE) break;
-                    await sleep(800);
+                    if (this.editAge(cur) > EDIT_GRACE) break;
+                    await sleep(400);
                 }
-                const cur = currentEditingId();
-                const last = cur ? (this._editAt[cur] || 0) : 0;
-                if (cur && need.has(cur) && Date.now() - last <= EDIT_GRACE) {
-                    this.trace({ renumber: "giveup", cur: cur });
+                const cur0 = currentEditingId();
+                if (cur0 && need.has(cur0) && this.editAge(cur0) <= EDIT_GRACE) {
+                    this.trace({ renumber: "giveup", why: "typing", cur: cur0 });
+                    this.noteGiveup("typing", docId);
+                    this.scheduleRetry();
                     return; // 人还在写，这轮放弃
                 }
             }
 
-            // 刚改过的块，blocks 表索引可能还没跟上，采集到的是半截内容 —— 这类块一律不写
+            // 刚改过的块，blocks 表索引可能还没跟上，采集到的是半截内容 —— 这类块一律不写。
+            // 这是防「写回把用户刚敲的字冲掉」的最后一道闸，宁可晚一轮也不能丢字。
             const hot = new Set();
             if (o.auto) {
                 for (const id of need) {
-                    if (Date.now() - (this._editAt[id] || 0) <= EDIT_GRACE) hot.add(id);
+                    if (this.editAge(id) <= EDIT_GRACE) hot.add(id);
+                }
+                // 只要有一个待改的块在保护窗口里，这轮就整轮推迟 ——
+                // 编号是全文档一起顺延的，单独跳过一块会写出「两个图 3」这种自相矛盾的状态。
+                // 推迟后挂重试，几秒后自动补上，不静默收场
+                if (hot.size) {
+                    this.trace({ renumber: "giveup", why: "hot-block", n: hot.size });
+                    this.noteGiveup("hot-block", docId);
+                    this.scheduleRetry();
+                    return;
                 }
             }
 
@@ -1248,6 +1369,7 @@ class SiYuanXref extends Plugin {
             // 上限 12s —— 100 个题注的文档按 n×200 算要 20s+，会让自动重排长时间瘫痪
             this._quietUntil = Date.now() + Math.min(4000 + r.plan.length * 200 + r.refs.length * 200, 12000);
             await applyPlan(r.plan, r.refs, hot, protyle || this._lastProtyle);
+            this._retryN = 0; // 这一轮真写进去了，重试链清零
             this.trace({ renumber: "applied", skipped: hot.size });
 
             // 已经坏掉的公式块（内容空、只剩 \tag）：插件不擅自改它，但要让用户知道
@@ -1351,9 +1473,69 @@ class SiYuanXref extends Plugin {
         this.trace({ autoRun: "done" });
     }
 
+    /**
+     * 自动轮放弃时留痕。以前放弃了悄无声息，用户只能看到「没反应」；
+     * 现在写进 err-log.json，出问题能直接看出卡在哪。
+     * 同一种原因 60 秒内只记一条，免得一直打字把日志刷爆。
+     */
+    noteGiveup(reason, docId) {
+        try {
+            const now = Date.now();
+            this._giveupAt = this._giveupAt || {};
+            if (now - (this._giveupAt[reason] || 0) < 60000) return;
+            this._giveupAt[reason] = now;
+            const why = {
+                "math-editing": "公式/代码编辑器开着，先不动，稍后重试",
+                "typing": "光标停在待改的块里，人还在写",
+                "hot-block": "要改的块刚被编辑过，内容可能还没进索引（编号需整体一致，故整轮推迟）",
+                "index-lag": "页面上有块、blocks 表里还没有（索引延迟），现在排会排错",
+                "nothing-yet": "刚才还在敲字，但这一轮没识别出可编号的内容",
+            }[reason] || reason;
+            logErr("giveup:" + reason, new Error("自动重排本轮放弃（" + why + "）doc=" + docId));
+        } catch (e) { /* 留痕失败不影响主功能 */ }
+    }
+
+    /**
+     * 放弃后别就此终结：稍后悄悄再来一轮，最多 4 次。
+     * 没有这个，一次被打断（开着公式、正在打字）就等于这篇文档再也不自动编号，
+     * 用户只能手动按快捷键 —— 这正是反馈里的现象。
+     *
+     * 间隔 = EDIT_GRACE + 800ms：必须晚于「刚编辑过」的保护窗口，
+     * 否则重试时那个块依然被判为 hot，等于白跑一轮（甚至连跑 4 次空转）。
+     */
+    scheduleRetry() {
+        const n = (this._retryN = (this._retryN || 0) + 1);
+        if (n > 4) { this._retryN = 0; return; }
+        if (!this.settings.autoMode) return;
+        clearTimeout(this._retryTimer);
+        this._retryTimer = setTimeout(() => {
+            this._retryTimer = null;
+            this.autoRun();
+        }, EDIT_GRACE + 800);
+    }
+
+    /** 这个块距上次被编辑过去了多久（毫秒）。没有记录 = 很久以前，当成「没在改」 */
+    editAge(id) {
+        if (!this._editAt) this._editAt = {}; // 极端情况下（加载失败/测试环境）也别抛异常
+        return Date.now() - (this._editAt[id] || 0);
+    }
+
+    /** 最近 EDIT_GRACE 内有没有块被编辑过（用来判断「这轮空手是暂时现象还是真没内容」） */
+    hasFreshEdit() {
+        try {
+            if (!this._editAt) return false;
+            const now = Date.now();
+            for (const k of Object.keys(this._editAt)) {
+                if (now - this._editAt[k] <= EDIT_GRACE) return true;
+            }
+        } catch (e) { /* 判断失败就当没有 */ }
+        return false;
+    }
+
     /** 记下「这个块刚被改过」。顺手做回收：长时间开着插件，_editAt 不该无限长 */
     markEdit(id) {
         const now = Date.now();
+        if (!this._editAt) this._editAt = {};
         this._editAt[id] = now;
         this._editN = (this._editN || 0) + 1;
         if (this._editN % 200 === 0) {
@@ -1533,5 +1715,5 @@ SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyP
     updateMathTag: updateMathTag, looksLossy: looksLossy, mathEditing: mathEditing,
     currentEditingId: currentEditingId,
     captionStyle: captionStyle, captionBgOf: captionBgOf, styleOf: styleOf,
-    hotkeyFromEvent: hotkeyFromEvent };
+    hotkeyFromEvent: hotkeyFromEvent, collectFresh: collectFresh, domTopIds: domTopIds };
 module.exports = SiYuanXref;

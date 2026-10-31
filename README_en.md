@@ -91,6 +91,18 @@ Three safety nets:
 - **The whole run is skipped while a formula editor has focus.**
 - **Length check before writing**: if the new content is more than 40 % shorter than the old one, the fetch is considered partial and the write is abandoned.
 
+## Why an automatic run sometimes did nothing (fixed in v0.9.1)
+
+The `blocks` table lags behind: writing a block takes 0.6–2 s (sometimes more) before SQL can see it. That caused three bugs:
+
+| Symptom | Cause | Now |
+|---|---|---|
+| Type "Figure 3 …" and nothing ever happens | The new block is not in `blocks` yet, so it never entered the collected snapshot and the plan was empty — the run returned silently | The snapshot is validated against the **top-level blocks actually on the page**; missing ones trigger a wait and re-collect, and if they are still missing the run defers and **retries** |
+| One protected block made the rest renumber anyway | Only the protected block was skipped, everything else was written — producing states like two "Figure 3"s | If any block that must change is inside the protection window, the **whole run is deferred** (numbering must stay consistent) and retried |
+| After opening the equation editor or simply typing, it never numbered again | Giving up had no follow-up, so the document was stuck on manual runs forever | Deferrals are logged as `giveup:<reason>` in `err-log.json` and retried up to 4 times |
+
+The old "am I editing an equation" check looked for a CSS class `.protyle-math` that **does not exist in SiYuan** (zero references in the whole bundle). It now looks for a visible, focused CodeMirror editor — equations, code and HTML blocks all use CodeMirror; the WYSIWYG prose does not.
+
 ## Performance (v0.9.0)
 
 | Metric | Before | Now |
@@ -109,7 +121,8 @@ Block order comes from one `getDoc` call: the order in which `data-node-id` appe
 - Renumbering rewrites block content, so extra entries appear in block history (rollback is possible there)
 - Automatic rewrites land on the undo stack: pressing `Ctrl+Z` right after typing may undo the plugin's change instead of your input. Turn auto off if that bothers you
 - While the caret rests in a block that needs rewriting, the plugin waits — so "the number did not change while I was typing" is expected; move the caret and it applies
-- The plugin waits roughly 8 seconds after the last edit (`EDIT_GRACE`): a freshly typed block is not indexed yet, and writing too early risks corrupting it
+- The plugin waits roughly 3 seconds after the last edit (`EDIT_GRACE`): a freshly typed block is not indexed yet and writing too early risks corrupting it. If that window is still not enough, the run gives up and retries automatically instead of silently doing nothing
+- Whenever an automatic run defers (equation editor open, still typing, index not caught up), it writes `giveup:<reason>` to `data/storage/petal/siyuan-xref/err-log.json` so you can see why nothing happened
 
 ## License
 
