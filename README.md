@@ -156,6 +156,17 @@ HTML 属性上。`/api/block/updateBlock` 用 `dataType: "markdown"` 时会**拿
 - **正在敲公式时整轮跳过**：公式编辑器一有焦点，这一轮直接放弃，等你写完再说。
 - **写回前比对长度**：新内容比旧内容短掉四成以上，判定为采集到了半截内容，放弃这次写入。
 
+## 构建与发布（开发者）
+
+```bash
+npm run check            # 语法 + 清单校验
+npm run build            # 生成 package.zip（文件在 zip 根层，不套目录）
+npm run deploy           # 打包并解到本地思源 data/plugins/siyuan-xref
+GH_TOKEN=ghp_xxx npm run release   # 改版本号后打 Release，附件即 package.zip
+```
+
+集市只认 GitHub **Latest Release** 里的 `package.zip`。以后发新版：改 `plugin.json` 的 `version` → 跑一次 `release`，索引会在一到三小时内自动更新，**不需要再提 PR**。
+
 ## 已知限制
 
 - 只能处理当前打开的文档，不跨文档
