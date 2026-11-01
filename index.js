@@ -15,6 +15,7 @@ const DEFAULTS = {
     refreshRefs: true,
     autoMode: true,     // 写完停手 autoDelay 毫秒后自动重排
     autoDelay: 1500,
+    textDetect: true,   // 靠正文前缀「图 3 …」自动认题注；关掉后只认 custom-xref 属性（右键设的）
     // 指向已删块的引用怎么处理：off 不看不标记（默认）| mark 只标红保留引用 | text 转成红色删除线文本
     // 1.0.2 起默认改成 off：标红是运行时加的 class，思源一重渲染就掉、下一轮又加回来，
     // 用户看到「红字+删除线」只会以为是插件把内容改坏了（2026-10-31 用户两次反馈）。
@@ -340,14 +341,77 @@ async function retry(fn, tries = 4, delay = 600) {
 
 const NUM_HEAD = /^\s*(图|表|Figure|Table)\s*(\d+(?:[-.]\d+)?)\s*/;
 
-/** 归类：custom-xref 属性优先；公式块=m→eq；段落前缀 图/表→fig/tab */
-function classify(b) {
+/** 归类：custom-xref 属性优先；公式块=m→eq；段落前缀 图/表→fig/tab
+ *
+ * opt.textDetect === false 时不认「图 3 xxx」这种正文前缀（设置里可关），
+ * 只认 custom-xref 属性 —— 手写正文里偶尔提到「图 3」的普通段落就不会被误当题注。
+ */
+function classify(b, opt) {
+    // 调用方点名强制归类（快通道用）：值是 fig/tab/eq，或 "" 表示「明确不是题注」。
+    // 后者不能省 —— 取消题注时属性已清、正文前缀刚被剥，但 blocks 表里两样都还是旧的，
+    // 光改 ial 会被「图 N …」前缀重新认成题注，编号永远不顺延。
+    if (b && Object.prototype.hasOwnProperty.call(b, "__xrKind")) {
+        if (b.__xrKind) return b.__xrKind;
+        return b.type === "m" ? "eq" : null;
+    }
     const m = /custom-xref="([^"]*)"/.exec(b.ial || "");
     if (m && ["fig", "tab", "eq"].indexOf(m[1]) >= 0) return m[1];
     if (b.type === "m") return "eq";
+    if (opt && opt.textDetect === false) return null;
     const p = NUM_HEAD.exec((b.markdown || "").trim());
     if (p) return p[1] === "图" || p[1] === "Figure" ? "fig" : "tab";
     return null;
+}
+
+/**
+ * 找出「锚文本还写着图表编号、目标块却已经不是题注」的引用 —— 取消题注留下的孤儿引用。
+ *
+ * 为什么不能靠 findDeadRefs：取消题注后块还活着，按存在性判永远查不出来；
+ * 而后续编号会把这个号让给别的块，正文里就出现「两条引用都叫图 2、指向不同块」的静默指错。
+ * 用户要求这类引用和失效引用完全一样处理（设置里那三档：不处理 / 仅标红 / 转成文本）。
+ *
+ * 三个条件同时成立才算，避免误伤用户自己打的引用：
+ *   ① 目标块在本文档里（不在 = 真失效引用，归 findDeadRefs 管）
+ *   ② 目标块已经不是题注（classify 返回 null）
+ *   ③ 引用锚文本长得像插件写的编号（isAutoCaptionName）
+ */
+function findOrphanCaptionRefs(blocks, s) {
+    const byId = {};
+    for (const b of blocks) byId[b.id] = b;
+    const out = new Set();
+    const REF = /\(\((\d{14}-[0-9a-z]{7})\s+(["'])(.*?)\2\)\)/g;
+    for (const b of blocks) {
+        const md = b.markdown || "";
+        if (md.indexOf("((") < 0) continue;
+        REF.lastIndex = 0;
+        let m;
+        while ((m = REF.exec(md))) {
+            const t = byId[m[1]];
+            if (!t) continue;                          // 目标不在文档里 → 失效引用那条路
+            if (classify(t, s)) continue;               // 还是题注 → 正常刷新锚文本
+            if (!isAutoCaptionName(m[3], s)) continue;  // 锚文本不像编号 → 用户自己的引用，不碰
+            out.add(t.id);
+        }
+    }
+    return Array.from(out);
+}
+
+/**
+ * 把「刚写进去但 SQL 还没看到」的属性盖到本次采集结果上。
+ * renumber 读的是 blocks.ial，而它索引滞后 0.6~2s；不等它，右键设题注就只能干等。
+ * 只影响这一轮的内存副本，不写库。
+ */
+function withKindOverride(blocks, map) {
+    if (!map || !blocks) return blocks;
+    for (const b of blocks) {
+        if (!Object.prototype.hasOwnProperty.call(map, b.id)) continue;
+        const k = map[b.id];
+        let ial = String(b.ial || "").replace(/\s*custom-xref="[^"]*"/g, "");
+        if (k) ial += ' custom-xref="' + k + '"';
+        b.ial = ial;
+        b.__xrKind = k;   // "" = 明确不是题注，盖住库里还没更新的「图 N」前缀
+    }
+    return blocks;
 }
 
 function stripNumber(kind, txt) {
@@ -358,6 +422,257 @@ function stripNumber(kind, txt) {
         return t.trim();
     }
     return t.replace(NUM_HEAD, "").trim();
+}
+
+/* ==================== 块右键菜单：设为图/表题注 ==================== */
+
+/** 取消题注时剥掉开头的「图 3」「表 2-1」，只动这一处，不 trim 正文 */
+function stripCaptionPrefix(md) {
+    return String(md || "").replace(NUM_HEAD, "");
+}
+
+/**
+ * 思源 click-blockicon / open-menu-content 的 detail.blockElements 是 **DOM 元素数组**，
+ * 不是 {id, type} 对象 —— 要用 getAttribute 取，DOM 的 data-type 还是 NodeParagraph 这种长名。
+ * 这里统一规整成 {id, type, img}，type 用 blocks 表的短码（p/t/m…），与 SQL 侧一致。
+ *
+ * ⚠ 图片块在 blocks 表里也是 type='p'（DOM 是 NodeParagraph 里包 span[data-type=img]），
+ *   所以必须单独用 img 标出来，否则会被当成普通段落放行。
+ */
+/** 思源 Menu 的项容器（类名几个版本略有差别，逐个试，最后退回 element 本身） */
+function menuItemRoot(menu) {
+    const el = menu && menu.element;
+    if (!el) return null;
+    try {
+        if (el.querySelector) {
+            const q = el.querySelector(".b3-menu__items");
+            if (q) return q;
+        }
+    } catch (e) { /* 退回 element */ }
+    return el;
+}
+
+/**
+ * 取「真正的主菜单」。
+ *
+ * ⚠ 关键结论（1.0.3 排查四轮后从思源 common.*.js 里读出来的）：
+ * 思源 App 层在 emit click-blockicon / open-menu-content 之前，会 new 一个 subMenu
+ * 顶替掉 detail.menu，等事件跑完再把这个 subMenu 整体挂成主菜单里那个「插件 ›」子项
+ * （`new MenuItem({id:"plugin", type:"submenu", submenu:y.menus})`）。
+ * 所以凡经 detail.menu.addItem 的项，**注定**进子菜单 —— 调 index、加分隔线、
+ * 之后再把 DOM 搬出来都没用，因为「插件 ›」这个子项本身就在主菜单最底部，
+ * 而节点搬家又会破坏 MenuItem 的宿主（它的 click 里 T.remove() 关的是 subMenu，不是主菜单）。
+ *
+ * 正路：主菜单实例仍挂在 window.siyuan.menus.menu 上，而且 MenuItem 的默认宿主就是它
+ * （`constructor(D, T = window.siyuan.menus.menu)`），在这里 addItem 既落在主菜单、
+ * 点完也能正常关闭菜单。
+ */
+function mainMenuOf(menu) {
+    try {
+        if (typeof window === "undefined") return null;
+        const m = window.siyuan && window.siyuan.menus && window.siyuan.menus.menu;
+        if (!m || m === menu) return null;
+        if (typeof m.addItem !== "function" || !m.element) return null;
+        if (typeof m.element.querySelector !== "function") return null;
+        // 主菜单必须有 items 容器，否则是初始化阶段的空壳，退回去用子菜单更安全
+        if (!m.element.querySelector(".b3-menu__items")) return null;
+        return m;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * 把刚 addItem 加进去的项搬到菜单最前面。
+ * 思源块菜单有二十多项，插件默认 append 在最底部 —— 不滚到底根本看不见，
+ * 用户会以为「没有这个菜单项」。这些项一直是直接挂在根菜单上的（没有 submenu），
+ * 这里只是换位置，顺手补一条分隔线，免得和思源自己的第一项粘在一起。
+ *
+ * before：addItem 之前容器的子节点数，用来界定哪些是新加的。
+ */
+function promoteMenuItems(menu, before) {
+    try {
+        const root = menuItemRoot(menu);
+        if (!root || !root.children) return;
+        const kids = Array.prototype.slice.call(root.children);
+        if (kids.length <= before) return;
+        const fresh = kids.slice(before);
+        const anchor = root.firstChild;
+        for (const el of fresh) root.insertBefore(el, anchor);
+        const doc = root.ownerDocument || (root.parentNode && root.parentNode.ownerDocument);
+        if (doc && root.children.length > fresh.length) {
+            const sep = doc.createElement("div");
+            sep.className = "b3-menu__separator";
+            root.insertBefore(sep, fresh[fresh.length - 1].nextSibling);
+        }
+    } catch (e) { /* 排不上就保持原位，功能不受影响 */ }
+}
+
+const DOM_TYPE_MAP = {
+    NodeParagraph: "p", NodeHeading: "h", NodeTable: "t", NodeMathBlock: "m",
+    NodeList: "l", NodeListItem: "i", NodeBlockquote: "b", NodeSuperBlock: "s",
+    NodeCodeBlock: "c", NodeDocument: "d", NodeAttributeView: "av",
+    NodeHTMLBlock: "html", NodeIFrame: "iframe", NodeVideo: "video", NodeAudio: "audio",
+    NodeWidget: "widget", NodeThematicBreak: "tb",
+};
+
+/**
+ * 是否在表格单元格内部（表格本身不算）。
+ * 单元格里的段落/图片有自己的 data-node-id，右键也会落到它们身上；
+ * 往那里写「图 1」会把单元格内容弄坏，所以在入口就标记出来、菜单里拦掉。
+ */
+function inTableCell(el) {
+    try {
+        if (!el || typeof el.closest !== "function") return false;
+        const t = el.closest('[data-type="NodeTable"]');
+        return !!t && t !== el;
+    } catch (e) { return false; }
+}
+
+function domBlockMeta(el) {
+    if (!el) return null;
+    // 已经是 {id,type} 形态（单测、或未来思源改结构）直接放行
+    if (!el.getAttribute && el.id) {
+        return { id: String(el.id), type: String(el.type || ""), img: !!el.img, tbl: !!el.tbl };
+    }
+    if (!el.getAttribute) return null;
+    const id = el.getAttribute("data-node-id") ||
+        (el.dataset && el.dataset.nodeId) || el.id || "";
+    if (!id) return null;
+    const dt = (el.getAttribute("data-type") || el.dataset && el.dataset.type || "") + "";
+    const tbl = inTableCell(el);
+    // 图片是**行内节点**（span[data-type=img]），它自己的 id 不是「块」：
+    // 题注段落得插在包着它的那个段落之后，所以这里先上溯到段落块，
+    // 否则算出来的「下方一块」是图片后面的行内文字，插块也会插到奇怪的地方。
+    if (dt === "img" || dt === "NodeImage") {
+        let host = el;
+        try { if (el.closest) host = el.closest('[data-type="NodeParagraph"]') || el; } catch (e) { host = el; }
+        if (host && host !== el && host.getAttribute && host.getAttribute("data-node-id")) {
+            return { id: host.getAttribute("data-node-id"), type: "p", img: true,
+                typeName: "NodeParagraph", el: host, tbl: tbl };
+        }
+        return { id: id, type: "p", img: true, typeName: dt, el: el, tbl: tbl };
+    }
+    const type = DOM_TYPE_MAP[dt] || dt;
+    let img = false;
+    try {
+        if (el.querySelector) img = !!el.querySelector('[data-type="img"], [data-type="NodeImage"], .img');
+        if (!img && el.classList) img = el.classList.contains("img");
+    } catch (e) { /* 拿不到就按段落处理，最多少拦一次 */ }
+    return { id: id, type: type, img: img, typeName: dt, el: el, tbl: tbl };
+}
+
+/**
+ * 图/表紧邻的那一块（只认普通段落，且不在表格里）。
+ * 方向按学术排版惯例：**图题在下、表题在上** —— 所以图看下一个兄弟，表看上一个。
+ * 返回 null = 那一侧没有可用段落；undefined = 拿不到 DOM（调用方就别提前判断）。
+ */
+function neighborPara(el, kind) {
+    try {
+        if (!el || !el.getAttribute) return undefined;
+        const key = kind === "tab" ? "previousElementSibling" : "nextElementSibling";
+        if (!(key in el)) return undefined;
+        const nx = el[key];
+        if (!nx || !nx.getAttribute) return null;
+        const m = domBlockMeta(nx);
+        if (!m || m.img || m.type !== "p" || m.tbl) return null;
+        return { id: m.id, kind: nx.getAttribute("custom-xref") || "", text: nx.textContent || "" };
+    } catch (e) { return undefined; }
+}
+
+/**
+ * 块右键菜单该出哪几项（纯函数，离线可测）。
+ * els  : 已规整的 [{id, type, img, tbl, next?}]，详见 captionMenu
+ * look : (id) => ({kind, text})，kind 取自块根节点的 custom-xref 属性，text 是段落文字
+ */
+
+/** 媒体块能当哪种题注：图片→fig，表格→tab；公式/代码/列表等一律不放行 */
+function mediaKindOf(e) {
+    if (!e) return "";
+    if (e.img) return "fig";
+    if (e.type === "t") return "tab";
+    return "";
+}
+
+/**
+ * 右键图片/表格：题注不能写进它自己（会变成「图 1 ![图](…)」这种坏文本，
+ * 表格更会直接毁掉表格结构），所以在它**旁边**插一个题注段落再编号 ——
+ * 图题插在图下方，表题插在表上方（学术排版惯例，也符合用户习惯）。
+ * 顺手提供两条捷径：那一侧已经是题注 → 给「取消」；那一侧是普通文字 → 给「设为…」。
+ */
+function mediaCaptionMenu(media) {
+    const kinds = media.map(mediaKindOf);
+    const bad = media.filter((e, i) => !kinds[i])[0];
+    if (bad) return { ok: false, mode: "none", reason: "type:" + (bad.type || "?"), items: [] };
+    if (kinds.some((k) => k !== kinds[0])) return { ok: false, mode: "none", reason: "mixed", items: [] };
+    const kind = kinds[0];
+    const word = kind === "fig" ? "图" : "表";
+    const where = kind === "fig" ? "下方" : "上方";
+    const icon = kind === "fig" ? "iconImage" : "iconTable";
+    const items = [{ key: "add", label: "在" + where + "添加" + word + "题注", icon: icon, kind: kind, add: true }];
+    if (media.length === 1) {
+        const hasNext = "next" in media[0];
+        const nb = hasNext ? media[0].next : undefined;
+        if (nb && nb.id) {
+            const nbKind = nb.kind || "";
+            const capLike = nbKind === "fig" || nbKind === "tab" || NUM_HEAD.test(String(nb.text || ""));
+            if (capLike) {
+                // 已经是同类型题注（或老数据只有「图 3」前缀没属性）才给「取消」
+                if (!nbKind || nbKind === kind) {
+                    items.push({ key: "clear", label: "取消图表题注", icon: "iconTrashcan",
+                        cancel: true, kind: kind, targets: [nb.id] });
+                }
+            } else if (String(nb.text || "").trim()) {
+                items.push({ key: "use-next", label: "把" + where + "段落设为" + word + "题注", icon: icon,
+                    kind: kind, targets: [nb.id] });
+            }
+        } else if (!hasNext) {
+            // 拿不到 DOM，判断不了那一侧有没有题注 —— 保守留着「取消」，点下去现场再找
+            items.push({ key: "clear", label: "取消图表题注", icon: "iconTrashcan", cancel: true, kind: kind });
+        }
+    }
+    return { ok: true, mode: "media", reason: "", kind: kind, items: items };
+}
+
+/**
+ * 块右键菜单该出哪几项（纯函数，离线可测）。
+ * els  : 已规整的 [{id, type, img, tbl, next?}]
+ * look : (id) => ({kind, text})，kind 取自块根节点的 custom-xref 属性，text 是段落文字
+ *
+ * 段落块：直接设成题注（往正文前面写「图 N」）。
+ * 图片/表格：不给「直接设」，改成在下方插题注段落（见 mediaCaptionMenu）。
+ * 表格单元格里的块：什么都不给 —— 往单元格里写编号会把表格搞坏。
+ * 公式/代码/列表等：仍然拦住（buildPlan 会往块里写坏文本）。
+ */
+function captionMenu(els, look) {
+    const list = (els || []).filter((e) => e && e.id);
+    if (!list.length) return { ok: false, mode: "none", reason: "empty", items: [] };
+    const inCell = list.filter((e) => e.tbl)[0];
+    if (inCell) return { ok: false, mode: "none", reason: "table", items: [] };
+    const isPara = (e) => !e.img && (!e.type || e.type === "p");
+    const media = list.filter((e) => !isPara(e));
+    if (media.length && media.length !== list.length) {
+        return { ok: false, mode: "none", reason: "mixed", items: [] };
+    }
+    if (media.length) return mediaCaptionMenu(media);
+    const info = list.map((e) => (look ? look(e.id) : null) || {});
+    // 已经是题注（有属性，或正文本来就以「图 3」开头）才显示「取消」，避免误删普通文字
+    const isCap = info.some((i) => i.kind === "fig" || i.kind === "tab" ||
+        NUM_HEAD.test(String(i.text || "")));
+    const items = [
+        { key: "fig", label: "设为图题注", icon: "iconImage", kind: "fig" },
+        { key: "tab", label: "设为表题注", icon: "iconTable", kind: "tab" },
+    ];
+    if (isCap) items.push({ key: "clear", label: "取消图表题注", icon: "iconTrashcan", cancel: true });
+    return { ok: true, mode: "para", reason: "", items: items };
+}
+
+/** 不能用题注时的灰字说明（按原因给不同提示，别让人以为是插件坏了） */
+function menuHint(reason) {
+    if (reason === "table") return "图表题注：表格单元格内不支持，请右键表格本身或表格上方的题注段落";
+    if (reason === "mixed") return "图表题注：请选中同类块（段落，或单张图/单个表）";
+    if (reason === "type:m") return "图表题注：公式块会自动编号，不用设题注";
+    return "图表题注：请右键图片/表格本身，或图下方（表上方）的题注段落";
 }
 
 /**
@@ -553,7 +868,7 @@ function buildPlan(blocks, s, deadSet) {
             seenH1 = true;
             continue;
         }
-        const kind = classify(b);
+        const kind = classify(b, s);
         if (!kind) continue;
         counters[kind] += 1;
         const seq = s.mode === "chapter" ? chapter + "-" + counters[kind] : String(counters[kind]);
@@ -879,6 +1194,64 @@ function captionStyle(ial, opt) {
     return s;
 }
 
+/**
+ * 我们给题注写过的块命名长什么样：`label + " " + seq`（「图 3」「表 1-2」「式 2」），
+ * 除标签和编号外没有别的字。取消题注时要靠这个认出「这名字是插件写的」，
+ * 否则用户自己起的块名（比如「图 1 试验设计」）会被一起抹掉。
+ */
+function captionLabelList(s) {
+    const out = [];
+    const push = (x) => {
+        const t = String(x || "").trim();
+        if (t && out.indexOf(t) < 0) out.push(t);
+    };
+    if (s) { push(s.figLabel); push(s.tabLabel); push(s.eqLabel); }
+    ["图", "表", "式", "Figure", "Table", "Equation", "Eq"].forEach(push);
+    // 长标签优先，否则「Equation 3」会先被「Eq」匹配掉一半
+    return out.sort((a, b) => b.length - a.length);
+}
+
+function isAutoCaptionName(name, s) {
+    const v = String(name || "").trim();
+    if (!v) return false;
+    const labs = captionLabelList(s).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    return new RegExp("^(?:" + labs.join("|") + ")\\s+\\d+(?:-\\d+)?$").test(v);
+}
+
+/** CSS 值归一化：只为比对用（去空白、小写、去掉小数末尾的 0，0.10 与 0.1 视为同一个） */
+function normCssVal(v) {
+    return String(v || "").replace(/\s+/g, "").toLowerCase()
+        .replace(/(\d+\.\d*?)0+(?=[,)])/g, "$1")
+        .replace(/\.(?=[,)])/g, "");
+}
+
+/**
+ * 去掉题注底色。只按调色板里的值精确匹配 —— 插件只会写这几个 rgba，
+ * 用户自己在工具条上设的底色（var(--b3-…) 之类）一定不匹配，不会被误删。
+ * 返回 null 表示没动；返回 "" 表示样式整体清空。
+ */
+function stripCaptionBg(style) {
+    const cur = String(style || "").trim();
+    if (!cur) return null;
+    const want = {};
+    Object.keys(CAPTION_BG).forEach((k) => {
+        const v = CAPTION_BG[k];
+        if (v) want[normCssVal(v)] = 1;
+    });
+    const kept = [];
+    let hit = false;
+    for (const d of cur.split(";")) {
+        const t = d.trim();
+        if (!t) continue;
+        const i = t.indexOf(":");
+        const prop = (i < 0 ? "" : t.slice(0, i)).trim().toLowerCase();
+        if (prop === "background-color" && want[normCssVal(t.slice(i + 1))]) { hit = true; continue; }
+        kept.push(t);
+    }
+    if (!hit) return null;
+    return kept.length ? kept.join("; ") + ";" : "";
+}
+
 /** 兼容旧调用：只补居中 */
 function centerStyle(ial) {
     return captionStyle(ial, { center: true });
@@ -1200,8 +1573,25 @@ class SiYuanXref extends Plugin {
             },
         });
         this.setting.addItem({
+            title: "文字自动识别",
+            description: "正文以「图 3 ……」「表 2 ……」开头的段落自动当作题注参与编号。关掉后只认" +
+                "右键菜单设的题注（custom-xref 属性）——正文里顺口写到「图 3 中可以看出」这种普通段落" +
+                "就不会被误编号。自动识别本来就要等索引进位，慢一点没关系；右键设的题注不受此开关影响，点了立刻生效",
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = this.settings.textDetect !== false;
+                inp.addEventListener("change", () => {
+                    this.settings.textDetect = inp.checked;
+                    this.saveSettings();
+                });
+                return inp;
+            },
+        });
+        this.setting.addItem({
             title: "失效引用怎么处理",
-            description: "指向已删块的引用。默认「不处理」：引用原样留着，删块后按 Ctrl+Alt+Z 能把块重建回来、" +
+            description: "指向已删块、或指向「已取消题注」的块的引用。默认「不处理」：引用原样留着，删块后按 Ctrl+Alt+Z 能把块重建回来、" +
                 "引用自动接回；「仅标红」会在正文里涂红加删除线（看着像内容被改坏）；" +
                 "「转成文本」会让引用彻底失效、无法还原，还会等 10 秒才动手",
             createActionElement: () => {
@@ -1397,6 +1787,7 @@ class SiYuanXref extends Plugin {
         });
 
         this.bindHotkeys();
+        this.bindBlockMenu();
         this._quietUntil = 0;
         this._running = false;
         this._editAt = {};
@@ -1522,6 +1913,501 @@ class SiYuanXref extends Plugin {
         return p;
     }
 
+    /* ==================== 块右键菜单：设为图/表题注 ==================== */
+
+    /** 只注册一次；菜单项按当前选中的块动态生成 */
+    bindBlockMenu() {
+        if (this._blockMenuOn) return;
+        this._blockMenuOn = true;
+        // click-blockicon：点块左侧那个小图标（块标菜单）
+        this.eventBus.on("click-blockicon", (e) => {
+            try { this.onBlockIcon(e, false); } catch (err) { logErr("click-blockicon", err); }
+        });
+        // open-menu-content：在正文里直接右键（另一个入口，不挂上就只有点块标才看得到）
+        // quiet=true：这里不显示「请右键题注段落」的灰提示，否则图片/表格上一右键就多一条废话
+        this.eventBus.on("open-menu-content", (e) => {
+            try { this.onBlockIcon(e, true); } catch (err) { logErr("open-menu-content", err); }
+        });
+    }
+
+    /** 同步读块根节点上的 custom-xref —— 菜单必须在同一个 tick 里建好，不能 await */
+    captionLook(protyle, id) {
+        let kind = "";
+        let text = "";
+        try {
+            const root = protyle && protyle.wysiwyg && protyle.wysiwyg.element;
+            const node = root && root.querySelector('[data-node-id="' + id + '"]');
+            if (node) {
+                kind = node.getAttribute("custom-xref") || "";
+                text = node.textContent || "";
+            }
+        } catch (e) { /* 取不到就当作普通段落，最多少一个「取消」项 */ }
+        return { kind: kind, text: text };
+    }
+
+    /**
+     * 从选区反推块元素：open-menu-content（正文右键）实测可能不给 blockElements，只给 range。
+     * 从 startContainer 往上找到第一个带 data-type 的祖先，就是块根节点。
+     */
+    elsFromRange(d) {
+        const out = [];
+        try {
+            const r = d && d.range;
+            let node = r && (r.startContainer || r.commonAncestorContainer);
+            while (node && node.nodeType === 3) node = node.parentNode;
+            let hops = 0;
+            while (node && node.getAttribute && hops++ < 20) {
+                if (node.getAttribute("data-node-id") && node.getAttribute("data-type")) {
+                    out.push(node);
+                    break;
+                }
+                node = node.parentNode;
+            }
+        } catch (e) { /* 反推失败就当没有 */ }
+        return out;
+    }
+
+    /**
+     * 诊断：把块菜单事件的 detail 结构记进 menu-probe.json（只留最近 10 条）。
+     * 右键才触发，频率极低，不影响性能；"菜单没出现"这类问题只能靠它定位。
+     */
+    logMenuProbe(src, e, els, hostKind) {
+        try {
+            const d = (e && e.detail) || {};
+            const pick = (x) => {
+                if (!x) return null;
+                return {
+                    id: x.getAttribute ? x.getAttribute("data-node-id") : (x.id || ""),
+                    dt: x.getAttribute ? x.getAttribute("data-type") : (x.type || ""),
+                    tag: x.tagName || "",
+                };
+            };
+            const arr = d.blockElements || d.elements || [];
+            const rec = {
+                t: new Date().toISOString(),
+                src: src,
+                detailKeys: Object.keys(d).slice(0, 24),
+                nRaw: arr.length,
+                raw: Array.prototype.map.call(arr, pick).slice(0, 5),
+                nUsed: els.length,
+                used: els.map((x) => ({ id: x.id, type: x.type, img: x.img })),
+                hasRange: !!d.range,
+                hasProtyle: !!d.protyle,
+                host: hostKind || "",
+            };
+            const list = (this._menuProbe || []).concat([rec]).slice(-10);
+            this._menuProbe = list;
+            this.saveData("menu-probe.json", list).catch(() => {});
+        } catch (err) { /* 诊断失败不影响菜单 */ }
+    }
+
+    /**
+     * 诊断：把菜单最终的 DOM 层级记进 menu-probe.json。
+     * 「菜单项没出现 / 跑到奇怪的位置」只能靠它定位 —— 光看代码是猜。
+     */
+    logMenuTree(menu) {
+        try {
+            const root = menuItemRoot(menu);
+            if (!root) return;
+            const items = Array.prototype.slice.call(root.children).slice(0, 40).map((el) => {
+                const cls = String((el && el.className) || "");
+                if (cls.indexOf("separator") >= 0) return "[分隔线]";
+                const txt = String((el && el.textContent) || "").replace(/\s+/g, " ").trim().slice(0, 24);
+                let sub = false;
+                try { sub = !!(el.querySelector && el.querySelector(".b3-menu__submenu, .b3-menu__item--submenu")); } catch (e) {}
+                return (sub ? "[" + txt + " ›]" : txt);
+            });
+            const list = this._menuProbe || [];
+            if (!list.length) return;
+            list[list.length - 1].menuTree = items;
+            this.saveData("menu-probe.json", list).catch(() => {});
+        } catch (e) { /* 诊断失败不影响菜单 */ }
+    }
+
+    onBlockIcon(e, quiet) {
+        const d = (e && e.detail) || {};
+        const menu = d.menu;
+        if (!menu || typeof menu.addItem !== "function") return;
+        // detail.menu 是被思源换过的 subMenu，项加进去只会落进「插件 ›」子菜单；
+        // 能拿到主菜单就直连主菜单，拿不到（老版本/异常时机）退回原样，功能不受影响
+        const host = mainMenuOf(menu) || menu;
+        // blockElements 是 DOM 元素数组（不是 {id,type}），必须先规整
+        const rawEls = d.blockElements || d.elements || [];
+        const els = [];
+        for (const el of rawEls) {
+            const m = domBlockMeta(el);
+            if (m) els.push(m);
+        }
+        // 正文右键一般不给 blockElements，从 range 反推
+        if (!els.length) {
+            for (const el of this.elsFromRange(d)) {
+                const m = domBlockMeta(el);
+                if (m) els.push(m);
+            }
+        }
+        this.logMenuProbe(quiet ? "open-menu-content" : "click-blockicon", e, els, host === menu ? "sub" : "main");
+        const protyle = d.protyle || this._lastProtyle || null;
+        // 图/表：顺手看清旁边那一块是什么（同步、只读 DOM），菜单才好给「取消」还是「设为…」
+        // 方向按图题在下、表题在上
+        for (const x of els) {
+            if (x.el && !x.tbl && (x.img || (x.type && x.type !== "p"))) {
+                x.next = neighborPara(x.el, x.img ? "fig" : "tab");
+            }
+        }
+        // 属性优先直接从刚拿到的 DOM 元素读（比反查 protyle 稳，protyle 取不到时也能用）
+        const look = (id) => {
+            for (const x of els) {
+                if (x.id !== id) continue;
+                if (x.el && x.el.getAttribute) {
+                    return { kind: x.el.getAttribute("custom-xref") || "", text: x.el.textContent || "" };
+                }
+            }
+            return this.captionLook(protyle, id);
+        };
+        const r = captionMenu(els, look);
+        if (!r.ok) {
+            // 表格单元格 / 公式块 / 混选：放一条灰掉的说明，让用户知道该右键哪儿，而不是以为插件没反应
+            // 正文右键（quiet）不加：那里已经有思源自己的图片/表格菜单，再塞一条灰字只是噪音
+            if (!quiet && r.reason && r.reason !== "empty") {
+                const root0 = menuItemRoot(host);
+                const before0 = root0 && root0.children ? root0.children.length : 0;
+                host.addItem({
+                    icon: "iconInfo",
+                    label: menuHint(r.reason),
+                    disabled: true,
+                });
+                promoteMenuItems(host, before0);
+            }
+            this.logMenuTree(host);
+            return;
+        }
+        const ids = els.map((x) => x.id);
+        const root = menuItemRoot(host);
+        const before = root && root.children ? root.children.length : 0;
+        for (const it of r.items) {
+            host.addItem({
+                icon: it.icon,
+                label: it.label,
+                click: () => {
+                    const p = protyle || this._lastProtyle || null;
+                    let job;
+                    if (it.cancel) {
+                        // 图片/表格上的「取消」：菜单里已经认出下方题注就直取，否则点下去现场找
+                        job = it.targets ? this.clearCaption(it.targets, p)
+                            : this.clearCaptionNear(ids, it.kind || "", p);
+                    } else if (it.targets) {
+                        job = this.setCaption(it.targets, it.kind, p);   // 把下方段落设为题注
+                    } else if (it.add) {
+                        job = this.addCaption(ids, it.kind, p);          // 在下方新建题注段落
+                    } else {
+                        job = this.setCaption(ids, it.kind, p);
+                    }
+                    job.catch((err) => {
+                        logErr("blockmenu/" + it.key, err);
+                        showMessage("siyuan-xref 出错：" + (err && err.message ? err.message : err), 6000, "error");
+                    });
+                },
+            });
+        }
+        promoteMenuItems(host, before);
+        this.logMenuTree(host);
+    }
+
+    /** kind 该以什么打头：优先用户自己配的标签，再兜中英文默认 */
+    captionHeadRe(kind) {
+        const lab = kind === "fig" ? (this.settings.figLabel || "图") : (this.settings.tabLabel || "表");
+        const esc = String(lab).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const alt = kind === "fig" ? "图|Figure" : "表|Table";
+        return new RegExp("^\\s*(" + esc + "|" + alt + ")\\s*\\d");
+    }
+
+    /**
+     * 属性写进 blocks 表有延迟，插件重排又是从 SQL 读 ial —— 不等它确认就重排，
+     * 这一轮识别不到刚设的题注，表现就是「点了没反应」。
+     * 先用 getBlockAttrs（实时，快）确认接口已生效，再用 SQL 确认重排真能读到。
+     */
+    async waitCaptionAttrs(ids, kind) {
+        for (let i = 0; i < 10; i++) {
+            let all = true;
+            for (const id of ids) {
+                try {
+                    const r = await api("/api/attr/getBlockAttrs", { id: id });
+                    if (String((r && r["custom-xref"]) || "") !== kind) { all = false; break; }
+                } catch (e) { all = false; break; }
+            }
+            if (all) return true;
+            await sleep(250);
+        }
+        return false;
+    }
+
+    /**
+     * blocks 表的 ial 才是重排真正读的东西（collectOnce 的 SQL）。
+     * 实测写入后要 0.6~2s 才可见，不等就重排会把刚设的图题注按旧前缀编成表号。
+     */
+    async waitCaptionInSql(ids, kind) {
+        const want = kind || "";
+        const q = "select id, ial from blocks where id in (" +
+            ids.map((i) => "'" + i + "'").join(",") + ") limit -1";
+        for (let i = 0; i < 16; i++) {
+            let all = true;
+            try {
+                const rows = (await sql(q)) || [];
+                const got = {};
+                rows.forEach((r) => { got[r.id] = ialValue(r.ial, "custom-xref"); });
+                for (const id of ids) {
+                    if (String(got[id] || "") !== want) { all = false; break; }
+                }
+            } catch (e) { all = false; }
+            if (all) return true;
+            await sleep(300);
+        }
+        return false;
+    }
+
+    /** 重排后核实：这些块是否真的带上编号了。没带的返回，交给调用方补一轮 */
+    async captionUnnumbered(ids, kind) {
+        const re = this.captionHeadRe(kind);
+        const bad = [];
+        for (const id of ids) {
+            let k = "";
+            try {
+                const r = await api("/api/block/getBlockKramdown", { id: id });
+                k = (r && r.kramdown) ? String(r.kramdown) : "";
+            } catch (e) { k = ""; }
+            if (!re.test(k)) bad.push(id);
+        }
+        return bad;
+    }
+
+    /**
+     * 属性已经写好之后的那一段：确认接口可见 → 重排 → 回读核实。
+     * 返回还没编号的块（空数组 = 全部就位）。
+     * setCaption（段落）和 addCaption（新建段落）共用，免得两处逻辑慢慢走偏。
+     */
+    async commitCaption(ids, kind, p) {
+        const map = {};
+        ids.forEach((id) => { map[id] = kind; });
+        // getBlockAttrs 是实时的：接口一返回就能读到，通常一轮就过（≈0ms）。
+        // 过了就把 kind 盖到采集结果上直接重排 —— 不再等 blocks 表索引（那个要 0.6~2s），
+        // 右键「设为题注」要的是抬手就看到编号。
+        const ready = await this.waitCaptionAttrs(ids, kind);
+        if (ready) {
+            await this.renumber(p, { kindOverride: map, mustInclude: ids });
+        } else {
+            // 罕见：属性一时读不到。宁可慢一点也不能按旧前缀排错编号
+            await this.waitCaptionInSql(ids, kind);
+            await sleep(200);
+            await this.renumber(p, { mustInclude: ids });
+        }
+        let left = await this.captionUnnumbered(ids, kind);
+        if (left.length) {
+            // 索引还差一点，补一轮；仍不行就留痕，别静默失败
+            await sleep(600);
+            await this.renumber(p, ready ? { kindOverride: map, mustInclude: ids } : { mustInclude: ids });
+            left = await this.captionUnnumbered(ids, kind);
+        }
+        return left;
+    }
+
+    async setCaption(ids, kind, protyle) {
+        if (!ids || !ids.length) return;
+        const p = protyle || this._lastProtyle || null;
+        if (!getDocId(p)) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
+        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
+        for (const id of ids) {
+            await retry(() => api("/api/attr/setBlockAttrs", { id: id, attrs: { "custom-xref": kind } }));
+        }
+        const left = await this.commitCaption(ids, kind, p);
+        const word = kind === "fig" ? "图" : "表";
+        if (left.length) {
+            await logErr("setCaption/not-numbered", new Error("未编号: " + left.join(",")));
+            showMessage("siyuan-xref：属性已写入，编号稍后自动补上（" + left.length + " 处）", 4000);
+        } else {
+            showMessage("已设为" + word + "题注" + (ids.length > 1 ? " " + ids.length + " 处" : ""), 2000);
+        }
+    }
+
+    /**
+     * 给图片/表格加题注：在它旁边插一个空段落，再按题注编号。
+     * 方向：**图题插在图下方、表题插在表上方**（学术排版惯例）。
+     *
+     * 为什么不直接把图/表本身标成题注：题注编号是**正文前缀**，
+     * 写进图片块会变成「图 1 ![图](…)」这种坏文本，写进表格块会直接毁掉表格结构。
+     * 实测 insertBlock 空字符串能干净地建出一个空段落（不是零宽字符那种脏块），
+     * 随后重排会把「图 1」/「表 1」写进这个段落，用户接着补写说明即可。
+     */
+    async addCaption(ids, kind, protyle) {
+        if (!ids || !ids.length) return;
+        const p = protyle || this._lastProtyle || null;
+        if (!getDocId(p)) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
+        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
+        const above = kind === "tab";
+        const made = [];
+        for (const id of ids) {
+            let nid = "";
+            // previousID = 插到该块之后；nextID = 插到该块之前
+            const req = { dataType: "markdown", data: "" };
+            if (above) req.nextID = id; else req.previousID = id;
+            try {
+                const r = await api("/api/block/insertBlock", req);
+                nid = (r && r[0] && r[0].doOperations && r[0].doOperations[0] &&
+                    r[0].doOperations[0].id) || "";
+            } catch (e) { await logErr("addCaption/insert", e); }
+            if (!nid) continue;
+            try {
+                await retry(() => api("/api/attr/setBlockAttrs", { id: nid, attrs: { "custom-xref": kind } }));
+            } catch (e) { await logErr("addCaption/attr", e); }
+            made.push(nid);
+        }
+        if (!made.length) {
+            showMessage("siyuan-xref：没能在图/表旁边插入题注段落，请重试", 5000, "error");
+            return;
+        }
+        const left = await this.commitCaption(made, kind, p);
+        const word = kind === "fig" ? "图" : "表";
+        if (left.length) {
+            await logErr("addCaption/not-numbered", new Error("未编号: " + left.join(",")));
+            showMessage("siyuan-xref：题注段落已插入，编号稍后自动补上", 4000);
+        } else {
+            showMessage("已在" + (above ? "上方" : "下方") + "添加" + word + "题注" +
+                (made.length > 1 ? " " + made.length + " 处" : "") + "，可直接补写说明", 2600);
+        }
+    }
+
+    /**
+     * 右键图片/表格点「取消图表题注」的兜底：现场找它旁边那个题注段落。
+     * 方向同插入：图往下看、表往上看。（菜单里通常已经算出来了，这条只在拿不到 DOM 时用。）
+     */
+    async clearCaptionNear(ids, kind, protyle) {
+        if (!ids || !ids.length) return;
+        const p = protyle || this._lastProtyle || null;
+        const docId = getDocId(p);
+        if (!docId) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
+        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
+        let blocks = [];
+        try { blocks = await collectBlocks(docId); } catch (e) { blocks = []; }
+        const at = {};
+        blocks.forEach((b, i) => { at[b.id] = i; });
+        const up = kind === "tab";
+        const targets = [];
+        for (const id of ids) {
+            const i = at[id];
+            if (i === undefined) continue;
+            const step = up ? -1 : 1;
+            // 最多看两格：中间可能夹着一个空段落
+            for (let n = 1; n <= 2; n++) {
+                const j = i + step * n;
+                if (j < 0 || j >= blocks.length) break;
+                const b = blocks[j];
+                if (b.type !== "p") break;
+                const k = classify(b, this.settings);
+                if (k) { if (!kind || k === kind) targets.push(b.id); break; }
+                if (String(b.markdown || "").trim()) break;   // 有正文却不是题注 → 不是它
+            }
+        }
+        if (!targets.length) {
+            showMessage("siyuan-xref：没找到该" + (up ? "表上方" : "图下方") + "的题注段落", 3500);
+            return;
+        }
+        await this.clearCaption(targets, p);
+    }
+
+    /**
+     * 取消题注：先清属性，再剥「图 3」前缀，最后重排让后面的编号顺延。
+     *
+     * ⚠ 顺序不能反。剥前缀走的是 updateBlock(dataType:"dom") 整块回传，回传的 DOM 里
+     * 带着块自己的 IAL —— 属性还没清就回传，会把 custom-xref="fig" 原样写回去，
+     * 而且这次回写的落地比 setBlockAttrs 还晚，表现就是「编号没了但属性还在，
+     * 下一轮又变回题注、后面的编号也不顺延」（1.0.3 快通道测试抓到的真 bug）。
+     */
+    async clearCaption(ids, protyle) {
+        if (!ids || !ids.length) return;
+        const p = protyle || this._lastProtyle || null;
+        const docId = getDocId(p);
+        if (!docId) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
+        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
+        // 1) 先清属性（getBlockAttrs 实时可读，一轮就过）
+        //    连同「块命名」和题注底色一起去掉：重排时写过 name="图 3"，
+        //    光清 custom-xref 会让这个块名永久残留（用户报的 bug）。
+        //    必须在这一步做：后面的剥前缀走 DOM 整块回传，回传时若 name 还在
+        //    （诊断实测：DOM 里带 name，回写后又写回块属性），就白清了。
+        let clearedName = 0;
+        for (const id of ids) {
+            let cur = {};
+            try { cur = (await api("/api/attr/getBlockAttrs", { id: id })) || {}; } catch (e) { cur = {}; }
+            const attrs = { "custom-xref": "" };
+            if (isAutoCaptionName(cur.name, this.settings)) {
+                attrs.name = "";
+                clearedName += 1;
+            }
+            const st = stripCaptionBg(cur.style);
+            if (st !== null) attrs.style = st;
+            await retry(() => api("/api/attr/setBlockAttrs", { id: id, attrs: attrs }));
+        }
+        await this.waitCaptionAttrs(ids, "");
+        // 2) 再剥前缀，此时 DOM 回传里已经没有 custom-xref
+        let changed = 0;
+        for (const id of ids) {
+            let k = "";
+            try {
+                const r = await api("/api/block/getBlockKramdown", { id: id });
+                k = (r && r.kramdown) ? String(r.kramdown) : "";
+            } catch (e) { continue; }
+            if (!k) continue;
+            // kramdown 末行是 IAL（{: id="…"}），它不是正文，别喂给 Lute
+            const body = k.replace(/\n?\{:[^}]*\}\s*$/, "");
+            const next = stripCaptionPrefix(body);
+            if (next === body) continue;
+            if (next.trim()) {
+                await updateContent(id, next.trim(), p, null);
+            } else {
+                // 题注正文只有编号（新建题注段落最常见：整块就一个「表 1」）——
+                // 剥完是空串，这里必须显式清空。实测 updateBlock(markdown,"") 能把段落
+                // 清成空块且块本身还在（不是删块）；md 模式会丢 IAL，但此时属性已在第 1 步清完。
+                await retry(() => api("/api/block/updateBlock",
+                    { id: id, dataType: "markdown", data: "" }));
+            }
+            changed += 1;
+        }
+        // 3) 复查：万一还是被回写带回来了（老版本/别的插件插一手），再清一次
+        const back = [];
+        for (const id of ids) {
+            try {
+                const r = (await api("/api/attr/getBlockAttrs", { id: id })) || {};
+                const again = {};
+                if (String(r["custom-xref"] || "")) again["custom-xref"] = "";
+                if (isAutoCaptionName(r.name, this.settings)) again.name = "";
+                const st2 = stripCaptionBg(r.style);
+                if (st2 !== null) again.style = st2;
+                if (Object.keys(again).length) back.push({ id: id, attrs: again });
+            } catch (e) { /* 读不到就交给下一轮 */ }
+        }
+        for (const b of back) {
+            await retry(() => api("/api/attr/setBlockAttrs", { id: b.id, attrs: b.attrs }));
+        }
+        // 同理：不等索引，直接把「属性已清」盖到本轮采集上，编号立刻顺延
+        const map = {};
+        ids.forEach((id) => { map[id] = ""; });
+        const ready = await this.waitCaptionAttrs(ids, "");
+        if (ready) {
+            await this.renumber(p, { kindOverride: map, mustInclude: ids });
+        } else {
+            await this.waitCaptionInSql(ids, "");
+            await sleep(200);
+            await this.renumber(p, { mustInclude: ids });
+        }
+        const bits = [];
+        if (!changed) bits.push("本来就没有编号前缀");
+        if (clearedName) bits.push("已清除块命名 " + clearedName + " 处");
+        // 「不处理」档下不改引用，但得让人知道有这么几处引用还挂着旧编号
+        if ((this.settings.deadRefAction || "off") === "off" && this._lastOrphan) {
+            bits.push("另有 " + this._lastOrphan + " 处引用仍写着原编号");
+        }
+        showMessage("已取消题注" + (ids.length > 1 ? " " + ids.length + " 处" : "") +
+            (bits.length ? "（" + bits.join("，") + "）" : ""), 2500);
+    }
+
     /** 只装一次全局监听；DOM 上没有编辑器时按下键也不会误伤 */
     bindHotkeys() {
         if (typeof document === "undefined") return;
@@ -1602,7 +2488,23 @@ class SiYuanXref extends Plugin {
         this._running = true;
         try {
             const got = await collectFresh(docId, protyle || this._lastProtyle);
-            const blocks = got.blocks;
+            let blocks = got.blocks;
+            // 快通道把「等 SQL 索引」这一步省了，但刚插入的块可能整个还没进 blocks 表 ——
+            // 那样 override 也拿它没办法（override 只能改已采到的块）。这类块先等一下再采，
+            // 只针对调用方点名要的 id，正常场景一次就齐、零开销。
+            if (o.mustInclude && o.mustInclude.length) {
+                for (let i = 0; i < 4; i++) {
+                    const have = new Set(blocks.map((b) => b.id));
+                    if (o.mustInclude.every((id) => have.has(id))) break;
+                    await sleep(250);
+                    const again = await collectFresh(docId, protyle || this._lastProtyle);
+                    blocks = again.blocks;
+                    got.stale = again.stale;
+                }
+            }
+            // 手动设/取消题注时，属性刚写进接口、blocks 表还没索引到，
+            // 这里用参数把新属性盖在采集结果上 —— 不写库，只让编号算对
+            if (o.kindOverride) withKindOverride(blocks, o.kindOverride);
             this.trace({ renumber: "collected", doc: docId, n: blocks.length, stale: got.stale, auto: !!o.auto });
             // 页面上有块、快照里没有 = blocks 表索引还没跟上。这时候排出来的编号一定是错的
             // （新题注根本没参与编号，旧编号也不会顺延），只能等下一轮
@@ -1614,9 +2516,17 @@ class SiYuanXref extends Plugin {
             }
             // 先判死链：删除块后编号会顺延，旧引用会静默指向错误的公式，必须标出来
             let deadIds = [];
+            this._lastOrphan = 0;
             const deadAct = this.settings.deadRefAction || "off";
+            // 取消题注留下的孤儿引用必须先判、而且不管哪一档都判：
+            // 纯本地正则，不花接口；off 档虽不动作，但要能告诉用户「还有几处引用写着旧编号」
+            let orphan = [];
+            try { orphan = findOrphanCaptionRefs(blocks, this.settings); } catch (e) { await logErr("renumber/orphan", e); }
+            this._lastOrphan = orphan.length;
             if (deadAct !== "off") {
                 try { deadIds = await findDeadRefs(blocks); } catch (e) { deadIds = []; }
+                // 并进来以后，标红（mark）和烧成文本（text）都走同一条链路，连 deadGrace 的等待也一样
+                if (orphan.length) deadIds = Array.from(new Set(deadIds.concat(orphan)));
             }
             // text 模式：死链要连续存在 deadGrace 毫秒才准烧成文本。
             // 烧掉就是销毁 ((块ID))，用户撤销把块恢复回来也接不回去 —— 得留一段反应时间
@@ -1732,9 +2642,16 @@ class SiYuanXref extends Plugin {
             if (!o.silent) {
                 let msg = "siyuan-xref：已重排 " + r.plan.length + " 项，刷新引用 " + r.refs.length + " 处";
                 if (dead.length) {
-                    msg += (this.settings.deadRefAction === "text")
-                        ? "，另把 " + dead.length + " 处失效引用转成了红色删除线文本"
-                        : "，发现 " + dead.length + " 处失效引用";
+                    if (this.settings.deadRefAction === "text") {
+                        // 只有真烧掉了才说「已转成」；还在宽限期内就照实说清
+                        const burned = (r.deadRefs || []).reduce((a, x) => a + (x.n || 0), 0);
+                        const gs = Math.round((this.settings.deadGrace || 10000) / 1000);
+                        msg += burned
+                            ? "，另把 " + burned + " 处失效引用转成了红色删除线文本"
+                            : "，发现 " + dead.length + " 处失效引用（" + gs + " 秒后仍未恢复才转文本）";
+                    } else {
+                        msg += "，发现 " + dead.length + " 处失效引用";
+                    }
                 }
                 showMessage(msg, 6000, dead.length ? "error" : "info");
             }
@@ -1761,7 +2678,8 @@ class SiYuanXref extends Plugin {
         if (!this._deadIds.length) { this._deadSig = ""; return; }
         if (sig === this._deadSig) return;
         this._deadSig = sig;
-        showMessage("siyuan-xref：" + this._deadIds.length + " 处交叉引用指向已删除的块，已在正文里标红", 7000, "error");
+        showMessage("siyuan-xref：" + this._deadIds.length +
+            " 处交叉引用已失效（指向已删的块，或该块已取消题注），已在正文里标红", 7000, "error");
     }
 
     /** 失效引用被改成文本前，把原文存档（最近 60 条），万一要人工恢复能查 */
@@ -2209,6 +3127,7 @@ class SiYuanXref extends Plugin {
 // 供本地离线测试使用（插件运行时不读这个字段）
 SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyPlan: applyPlan,
     classify: classify, findDeadRefs: findDeadRefs, paintDead: paintDead, rebuildBlock: rebuildBlock,
+    withKindOverride: withKindOverride,
     isBlockAlive: isBlockAlive, aliveMap: aliveMap, dropStaleDead: dropStaleDead, collectRaw: collectRaw,
     ownVersion: ownVersion,
     slashRangeIn: slashRangeIn, restoreCaret: restoreCaret, getDocId: getDocId,
@@ -2217,6 +3136,13 @@ SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyP
     updateMathTag: updateMathTag, looksLossy: looksLossy, mathEditing: mathEditing,
     currentEditingId: currentEditingId,
     captionStyle: captionStyle, captionBgOf: captionBgOf, styleOf: styleOf,
+    isAutoCaptionName: isAutoCaptionName, stripCaptionBg: stripCaptionBg,
+    findOrphanCaptionRefs: findOrphanCaptionRefs,
     hotkeyFromEvent: hotkeyFromEvent, collectFresh: collectFresh, domTopIds: domTopIds,
+    captionMenu: captionMenu, domBlockMeta: domBlockMeta, promoteMenuItems: promoteMenuItems,
+    mediaCaptionMenu: mediaCaptionMenu, mediaKindOf: mediaKindOf, menuHint: menuHint,
+    inTableCell: inTableCell, neighborPara: neighborPara,
+    mainMenuOf: mainMenuOf, menuItemRoot: menuItemRoot,
+    stripCaptionPrefix: stripCaptionPrefix, DEFAULTS: DEFAULTS,
     ialValue: ialValue, restoreDeadInMd: restoreDeadInMd, countRestored: countRestored };
 module.exports = SiYuanXref;

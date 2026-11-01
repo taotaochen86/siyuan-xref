@@ -2,7 +2,7 @@
   "name": "siyuan-xref",
   "author": "陈涛涛 (Taotao Chen)",
   "url": "https://github.com/taotaochen86/siyuan-xref",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "minAppVersion": "3.7.0",
   "backends": [
     "all"
@@ -11,14 +11,14 @@
     "desktop",
     "mobile"
   ],
-  "disabledInPublish": true,
+  "disabledInPublish": false,
   "displayName": {
     "default": "Figure & Equation Xref",
     "zh-CN": "图表公式交叉引用"
   },
   "description": {
-    "default": "Auto-number figures, tables and equations, then refresh cross-references about 1.5s after you stop typing. Captions are centered with a faint tint. Equation blocks are updated in place on data-content only, so formulas are never wiped. Deleted a figure or table by mistake? Ctrl+Alt+Z rebuilds the deleted blocks with their original block IDs, so every cross-reference reconnects on its own (dead references are no longer painted red or burnt to text by default). Built-in undo stack (Ctrl+Alt+Z / Ctrl+Alt+Y, 10 runs by default, survives restart) because SiYuan's own Ctrl+Z does not capture API writes. Slash command /xref inserts a live block reference; custom hotkeys supported.",
-    "zh-CN": "自动重排图、表、公式编号并同步刷新交叉引用；写完题注停手约 1.5 秒自动生效。图/表题注自动居中并加一层浅底色（深浅可调）。公式只改 data-content 上的编号，不重建块，公式正文绝不会丢；空公式不编号。正在输入公式或代码时整轮跳过并自动补一轮重试，不会一次被打断就再也不排。误删图/表后按 Ctrl+Alt+Z，插件会把删掉的块按原块 ID 重建回来，指向它的交叉引用自动接上（默认不再把死链涂红或转成文本）。插件自带撤销栈，Ctrl+Alt+Z 撤回上一轮重排、Ctrl+Alt+Y 重做，默认保留 10 轮、跨重启有效。编辑器内输入 /xref 插入引用。支持自定义快捷键。"
+    "default": "Number figures, tables and equations automatically and keep every cross-reference in sync. Right-click a paragraph and choose Set as figure caption / Set as table caption — applied in about 0.6s, no attribute typing; right-click an image or a table and the caption paragraph is created in the right place (below a figure, above a table), never inside the image or table block; right-clicking inside a table cell offers no caption menu at all. Clear caption removes the attribute, the auto block name, the tint and the leading number in one click, and shifts the following numbers up. Equations are updated in place on data-content only, so a formula body can never be wiped; empty equations are never numbered. Text auto-detection can be switched off, so an ordinary sentence starting with 图 3 is no longer mistaken for a caption. Typing pauses trigger a silent renumber in 1.5-3s. Deleted a figure by mistake? Ctrl+Alt+Z rebuilds the block with its original ID and the references reconnect by themselves (dead references are left untouched by default). Built-in undo stack (Ctrl+Alt+Z / Ctrl+Alt+Y, 10 runs, survives restart) because SiYuan's own Ctrl+Z cannot undo API writes. Slash command /xref inserts a live block reference; all four hotkeys are rebindable.",
+    "zh-CN": "自动重排图、表、公式编号并同步刷新交叉引用；写完题注停手 1.5～3 秒自动生效。右键段落选「设为图题注 / 设为表题注」，不用记 custom-xref 属性，0.6 秒出号；右键图片或表格，题注段落会建在正确的位置（图题在下、表题在上），绝不写进图片块或表格块内部；表格单元格内侧右键不出现任何题注菜单。「取消图表题注」一次清干净：属性、自动块名、底色、段首编号一并去掉，后面的编号自动顺延。公式只改 data-content 上的编号，不重建块，公式正文绝不会丢；空公式不编号。「文字自动识别」可关，关掉后正文里顺口写「图 3 中可以看出」不会被误编号。图/表题注自动居中并加一层浅底色（深浅可调）。误删图/表后按 Ctrl+Alt+Z，插件会把删掉的块按原块 ID 重建回来，指向它的交叉引用自动接上（默认不再把死链涂红或转成文本）。插件自带撤销栈，Ctrl+Alt+Z 撤回上一轮重排、Ctrl+Alt+Y 重做，默认保留 10 轮、跨重启有效。编辑器内输入 /xref 插入引用；四个快捷键都能自定义。"
   },
   "readme": {
     "default": "README_en.md",
