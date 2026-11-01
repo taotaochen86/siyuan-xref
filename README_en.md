@@ -434,6 +434,7 @@ Right-click a paragraph / image / table → the top of the menu:
 - 1.0.6 → 1.0.7: equations are rendered as formulas in the picker instead of showing LaTeX source. No migration.
 - 1.0.7 → 1.0.8: the picker gains the kind + section filters. No migration, numbering rules untouched.
 - 1.0.8 → 1.0.9: the interface grows from two languages to **10** (Traditional Chinese, Japanese, Korean, German, French, Spanish, Russian and Brazilian Portuguese added); caption prefix detection is extended to the same 10 languages, so switching languages never doubles the numbering. No migration, the numbering algorithm is untouched.
+- 1.0.9 → 1.0.10: the marketplace card summary is shortened to under 100 characters only. Features, numbering rules and menus are unchanged.
 - If behaviour does not change after upgrading, toggle the plugin off and on (see [7.1](#71-install-and-enable)).
 
 ---

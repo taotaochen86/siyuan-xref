@@ -1,6 +1,6 @@
 {
   "name": "siyuan-xref",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Auto-number figures, tables and equations in SiYuan and keep cross-references in sync. Interface in 10 languages.",
   "license": "MIT",
   "author": "陈涛涛 (Taotao Chen)",
