@@ -100,12 +100,14 @@ A figure or a table **cannot be its own caption block** — writing a number int
 - Automatic and manual runs are mutually exclusive (`_running`), so they never write the same block at once.
 - The global network probe is **off by default** and only installed when Diagnostic log is enabled (it costs performance).
 
-### 2.9 Bilingual interface (follows SiYuan)
+### 2.9 Interface in 10 languages (follows SiYuan, expanded in 1.0.9)
 
-- There is no language switch: the plugin follows Settings → Appearance → Language. SiYuan in Chinese gives a fully Chinese plugin; SiYuan in English (or any other language) gives an English one.
-- Covered: right-click menus, every message, the settings panel (titles, descriptions, dropdown options), slash commands, command names and the cross-reference picker (including its filter buttons All / Figure / Table / Eq and the All sections dropdown).
-- Number labels follow too: with an English interface new captions default to `Figure 1` / `Table 1` / `Eq 1`; in Chinese they are 图 1 / 表 1 / 式 1. Labels you typed into settings always win and are never overridden.
-- Caption prefixes in either language are recognised: an old Chinese document opened under an English interface still numbers 图 3 correctly, and the other way round.
+- There is no language switch: the plugin follows Settings → Appearance → Language.
+- Built in: **Simplified Chinese, Traditional Chinese, English, Japanese, Korean, German, French, Spanish, Russian and Brazilian Portuguese**. The other 12 SiYuan languages (Arabic, Hebrew, Hindi, Indonesian, Italian, Dutch, Polish, Slovak, Serbian, Thai, Turkish, Ukrainian) fall back to English.
+- Covered: right-click menus, every message, the settings panel (titles, descriptions, dropdown options), slash commands, command names and the cross-reference picker (including its filter buttons and section dropdown).
+- Number labels follow too (the default prefix for new captions): 图 / 圖 / `Figure` / 図 / 그림 / `Abb.` / `Fig.` / `Fig.` / `Рис.` / `Fig.`. Labels you typed into settings always win and are never overridden.
+- Captions already in the document are still recognised after switching: a leading 图 3 / Figure 3 / Abb. 6 / Рис. 9 / 표 5 / 図 4 / Figura 8 is detected in all ten languages, so **numbers never double up**; Clear caption also strips those prefixes cleanly, leaving no debris.
+- Logs (`err-log.json` / `undo-stack.json`) stay in Chinese on purpose — they are for troubleshooting only and never reach the UI.
 
 ### 2.10 Filter the picker by kind / section (new in 1.0.8)
 
@@ -431,6 +433,7 @@ Right-click a paragraph / image / table → the top of the menu:
 - 1.0.5 → 1.0.6: in-text right-click can insert a cross-reference; the interface is bilingual (follows SiYuan). Existing documents are untouched, no migration needed.
 - 1.0.6 → 1.0.7: equations are rendered as formulas in the picker instead of showing LaTeX source. No migration.
 - 1.0.7 → 1.0.8: the picker gains the kind + section filters. No migration, numbering rules untouched.
+- 1.0.8 → 1.0.9: the interface grows from two languages to **10** (Traditional Chinese, Japanese, Korean, German, French, Spanish, Russian and Brazilian Portuguese added); caption prefix detection is extended to the same 10 languages, so switching languages never doubles the numbering. No migration, the numbering algorithm is untouched.
 - If behaviour does not change after upgrading, toggle the plugin off and on (see [7.1](#71-install-and-enable)).
 
 ---

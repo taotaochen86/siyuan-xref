@@ -7,10 +7,13 @@ const { Plugin, Setting, showMessage, fetchSyncPost } = require("siyuan");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/* ==================== 界面语言（中 / 英，跟随思源） ====================
- * 思源把界面语言放在 window.siyuan.config.lang（zh_CN / en_US / es_ES …）。
- * 插件不另设开关（用户 2026-11-01 定：只跟随思源）：zh* 出中文，其余一律出英文
- * —— 英文覆盖最广，西语/法语用户看英文也比看中文有用。
+/* ==================== 界面语言（10 种，跟随思源） ====================
+ * 思源把界面语言放在 window.siyuan.config.lang，可选值见 conf/appearance/langs/（22 种）。
+ * 插件不另设开关（用户 2026-11-01 定：只跟随思源）。内置 10 种：
+ *   zh-CN→zh  zh-TW→zhTW  en→en  ja→ja  ko→ko  de→de  fr→fr  es→es  ru→ru  pt-BR→ptBR
+ * 其余 12 种（ar he hi id it nl pl sk sr th tr uk）一律退英文 —— 英文覆盖最广，
+ * 看英文也比看中文有用。新增语种只要往 UI_TEXT 加一块、往 LANG_MAP 加一行即可，
+ * 缺 key 时自动回退（中文系退 zh，其余退 en），不会再漏文案。
  * 所有用户可见文案统一走 tr("key", 参数…)，{0} {1} 是占位符。
  * 离线测试没有 window，detectUiLang 返回 zh，所以旧断言一行都不用改。
  */
@@ -252,29 +255,557 @@ const UI_TEXT = {
         "picker.noAnchor": "siyuan-xref: cannot locate this paragraph, nothing was inserted. Put the caret in the target paragraph and retry",
         "picker.noSlash": "siyuan-xref: cannot locate where /xref was typed, insertion cancelled. Put the caret in the target paragraph and retry",
     },
+    zhTW: {
+        // 繁體中文（思源 zh-TW）
+        "label.fig": "圖", "label.tab": "表",
+        "label.eq": "式", "dead.text": "失效引用",
+        "slash.xref.text": "交叉引用", "slash.xref.meta": "圖 / 表 / 式",
+        "slash.num.text": "重排圖表編號", "slash.num.meta": "同步更新引用",
+        "cmd.insert": "插入交叉引用", "cmd.renumber": "重排圖表編號",
+        "cmd.undo": "復原上次重排", "cmd.redo": "重做重排",
+        "menu.setFig": "設為圖題註", "menu.setTab": "設為表題註",
+        "menu.clear": "取消圖表題註", "menu.add": "在{0}新增{1}題註",
+        "menu.useNext": "把{0}段落設為{1}題註", "menu.ref": "插入交叉引用…",
+        "menu.where.below": "下方", "menu.where.above": "上方",
+        "menu.word.fig": "圖", "menu.word.tab": "表",
+        "noun.image": "圖片", "noun.table": "表格",
+        "hint.table": "圖表題註：表格儲存格內不支援，請右鍵表格本身或表格上方的題註段落", "hint.mixed": "圖表題註：請選取同類區塊（段落，或單張圖／單一表格）",
+        "hint.math": "圖表題註：公式區塊會自動編號，不用設題註", "hint.default": "圖表題註：請右鍵圖片／表格本身，或圖下方（表上方）的題註段落",
+        "set.mode.title": "編號模式", "set.mode.desc": "全文連續（圖 1、圖 2）或依一級標題分章（圖 1-1、圖 2-1）",
+        "set.mode.continuous": "全文連續", "set.mode.chapter": "依章編號",
+        "set.labels.title": "圖／表／式 標籤", "set.labels.desc": "題註前置文字，例如填 Figure / Table / Eq",
+        "set.refs.title": "重排時同步更新引用", "set.refs.desc": "把 ((區塊ID \"舊錨文字\")) 全部改成新編號。關閉後只改編號不動引用",
+        "set.auto.title": "自動重排", "set.auto.desc": "寫完題註停手 1.5 秒後自動重排編號並更新引用。不會寫入游標所在的區塊，避免打斷輸入",
+        "set.detect.title": "文字自動辨識", "set.detect.desc": "正文以「圖 3 ……」「表 2 ……」開頭的段落自動當作題註參與編號。關掉後只認右鍵選單設的題註（custom-xref 屬性）——正文裡順口寫到「圖 3 中可以看出」這種普通段落就不會被誤編號。自動辨識本來就要等索引到位，慢一點沒關係；右鍵設的題註不受此開關影響，點了立刻生效",
+        "set.dead.title": "失效引用如何處理", "set.dead.desc": "指向已刪區塊、或指向「已取消題註」的區塊的引用。預設「不處理」：引用原樣留著，刪區塊後按 Ctrl+Alt+Z 能把區塊重建回來、引用自動接回；「僅標紅」會在正文裡塗紅加刪除線（看起來像內容被改壞）；「轉成文字」會讓引用徹底失效、無法還原，還會等 10 秒才動作",
+        "set.dead.off": "不處理，保持原樣（建議）", "set.dead.mark": "僅標紅，保留引用",
+        "set.dead.text": "轉成紅色刪除線文字（不可逆）", "set.center.title": "題註置中",
+        "set.center.desc": "重排時把「圖 N …」「表 N …」題註段落設為置中", "set.bg.title": "題註底色",
+        "set.bg.desc": "給「圖 N …」「表 N …」題註加一層很淡的底色，暗色主題下也看得清；自己設過底色的不會被改", "set.bg.none": "無底色",
+        "set.bg.faint": "極淺", "set.bg.light": "淺（預設）",
+        "set.bg.blue": "淺藍", "set.keys.title": "自訂快速鍵",
+        "set.keys.desc": "點一下輸入框，再按下想用的組合鍵（必須帶 Ctrl / Alt / ⌘）。Backspace 清空，Esc 取消。同時也會出現在「設定 → 快速鍵 → 外掛」裡，兩處改都行", "set.keys.insert": "插入交叉引用",
+        "set.keys.renumber": "重排編號", "set.keys.undo": "復原上次重排",
+        "set.keys.redo": "重做", "set.keys.unset": "未設定",
+        "set.keys.press": "請按組合鍵…", "set.keys.tip": "點擊後按下組合鍵",
+        "set.undo.title": "復原步數", "set.undo.desc": "外掛自己記多少輪重排可以復原（1~50）。思源的 Ctrl+Z 復原不到外掛寫入，所以單獨記一份",
+        "set.restore.title": "還原失效引用", "set.restore.desc": "把以前被「轉成文字」燒掉的引用改回 ((區塊ID \"錨\"))。目標區塊已刪除的會自動跳過",
+        "set.restore.btn": "還原目前文件", "set.restore.busy": "還原中…",
+        "set.debug.title": "診斷記錄（排查用）", "set.debug.desc": "開啟後會攔截全域網路請求並寫 ws-log.json / err-log.json。只在排查問題時開，平時請關閉，會拖慢思源",
+        "msg.loadErr": "siyuan-xref 載入異常：{0}（詳見 data/storage/petal/siyuan-xref/err-log.json）", "msg.error": "siyuan-xref 出錯：{0}",
+        "msg.noDoc": "siyuan-xref：未取得目前文件", "msg.busy": "siyuan-xref：重排一直沒結束，本次操作未執行，請稍後重試",
+        "msg.renumbering": "siyuan-xref：正在重排，請稍候再試", "msg.setDone": "已設為{0}題註{1}",
+        "msg.nBlocks": " {0} 處", "msg.attrWritten": "siyuan-xref：屬性已寫入，編號稍後自動補上（{0} 處）",
+        "msg.addFail": "siyuan-xref：沒能在圖／表旁邊插入題註段落，請重試", "msg.addPending": "siyuan-xref：題註段落已插入，編號稍後自動補上",
+        "msg.addDone": "已在{0}新增{1}題註{2}，可直接補寫說明", "msg.notIndexed": "siyuan-xref：這個區塊還沒進索引，請稍後重試",
+        "msg.wrongSide": "siyuan-xref：題註不在{0}{1}，而在另一側。請直接右鍵那個題註段落，選「取消圖表題註」", "msg.noNeighbor": "siyuan-xref：找不到該{0}{1}緊鄰的題註段落，請右鍵題註段落本身取消",
+        "msg.cancelled": "已取消題註{0}{1}", "msg.cancelWrap": "（{0}）",
+        "msg.cancel.none": "本來就沒有編號前置", "msg.cancel.names": "已清除區塊命名 {0} 處",
+        "msg.cancel.stuck": "{0} 處的編號前置沒能去除，請手動刪掉那行前置後重試", "msg.cancel.orphan": "另有 {0} 處引用仍寫著原編號",
+        "msg.sep": "，", "msg.settingsSaved": "siyuan-xref：設定已儲存",
+        "msg.noTargets": "siyuan-xref：本文件沒辨識到圖／表／公式", "msg.emptyEq": "siyuan-xref：有 {0} 個公式區塊內容為空（只剩 \\tag），請檢查公式是否遺失",
+        "msg.renumbered": "siyuan-xref：已重排 {0} 項，更新引用 {1} 處", "msg.burned": "，另把 {0} 處失效引用轉成紅色刪除線文字",
+        "msg.deadGrace": "，發現 {0} 處失效引用（{1} 秒後仍未恢復才轉文字）", "msg.deadFound": "，發現 {0} 處失效引用",
+        "msg.deadPainted": "siyuan-xref：{0} 處交叉引用已失效（指向已刪的區塊，或該區塊已取消題註），已在正文裡標紅", "msg.noUndo": "siyuan-xref：沒有可復原的重排記錄",
+        "msg.undoDone": "siyuan-xref：已復原 {0} 那輪重排（{1} 處{2}{3}），還剩 {4} 步可復原", "msg.undoRebuilt": "，重建了 {0} 個已被刪除的區塊",
+        "msg.undoMiss": "，{0} 處區塊已不存在", "msg.noRedo": "siyuan-xref：沒有可重做的重排記錄",
+        "msg.redoDone": "siyuan-xref：已重做，復原堆疊 {0} 步{1}", "msg.redoRebuilt": "（重建 {0} 區塊）",
+        "msg.noArchive": "siyuan-xref：沒有可還原的記錄（dead-fix-log.json 為空）", "msg.noDocDead": "siyuan-xref：目前文件沒有失效引用記錄",
+        "msg.restored": "siyuan-xref：還原 {0} 處引用（{1} 個區塊）{2}", "msg.restoreMiss": "；{0} 個區塊找不到或目標區塊已刪",
+        "msg.readFail": "siyuan-xref 讀取失敗：{0}", "msg.insertFail": "插入失敗：{0}",
+        "picker.title": "插入交叉引用", "picker.ph": "搜尋編號或題註，↑↓ 選擇，Enter 插入，Esc 關閉",
+        "picker.empty": "沒有符合項目", "picker.all": "全部",
+        "picker.allSec": "全部章節", "picker.secTip": "只看某個標題下的圖／表／式（含它的子標題）",
+        "picker.secNone": "（無標題）", "picker.noAnchor": "siyuan-xref：定位不到這個段落，引用未插入。請把游標放到目標段落再試",
+        "picker.noSlash": "siyuan-xref：定位不到 /xref 所在位置，已取消插入。請把游標放到目標段落再試",
+    },
+    ja: {
+        // 日本語（思源 ja）
+        "label.fig": "図", "label.tab": "表",
+        "label.eq": "式", "dead.text": "リンク切れ参照",
+        "slash.xref.text": "相互参照", "slash.xref.meta": "図 / 表 / 式",
+        "slash.num.text": "図表番号を振り直す", "slash.num.meta": "参照も同時に更新",
+        "cmd.insert": "相互参照を挿入", "cmd.renumber": "図表番号を振り直す",
+        "cmd.undo": "前回の振り直しを元に戻す", "cmd.redo": "振り直しをやり直す",
+        "menu.setFig": "図のキャプションに設定", "menu.setTab": "表のキャプションに設定",
+        "menu.clear": "キャプションを解除", "menu.add": "{0}に{1}のキャプションを追加",
+        "menu.useNext": "{0}の段落を{1}のキャプションにする", "menu.ref": "相互参照を挿入…",
+        "menu.where.below": "下", "menu.where.above": "上",
+        "menu.word.fig": "図", "menu.word.tab": "表",
+        "noun.image": "画像", "noun.table": "表",
+        "hint.table": "キャプション：表のセル内では使えません。表そのもの、または表の上のキャプション段落を右クリックしてください", "hint.mixed": "キャプション：同じ種類のブロックを選んでください（段落、または画像 1 枚 / 表 1 つ）",
+        "hint.math": "キャプション：数式ブロックは自動で番号が付くので、キャプションは不要です", "hint.default": "キャプション：画像 / 表そのもの、または図の下（表の上）のキャプション段落を右クリックしてください",
+        "set.mode.title": "番号の付け方", "set.mode.desc": "文書全体で連番（図 1、図 2）または最上位の見出しごとに振り直す（図 1-1、図 2-1）",
+        "set.mode.continuous": "全体で連番", "set.mode.chapter": "見出しごと",
+        "set.labels.title": "図 / 表 / 式 のラベル", "set.labels.desc": "番号の前に付ける文字。例：Figure / Table / Eq",
+        "set.refs.title": "振り直し時に参照も更新", "set.refs.desc": "((ブロックID \"旧アンカー\")) をすべて新しい番号に書き換えます。オフにすると番号だけ変わり、参照はそのままです",
+        "set.auto.title": "自動で振り直す", "set.auto.desc": "入力が止まって 1.5 秒後に番号を振り直し、参照も更新します。カーソルのあるブロックには書き込まないので、入力の邪魔をしません",
+        "set.detect.title": "本文からキャプションを自動判定", "set.detect.desc": "「図 3 ……」「表 2 ……」で始まる段落をキャプションとみなして番号を付けます。オフにすると右クリックメニューで設定したキャプション（custom-xref 属性）だけを対象にするので、「図 3 に示すように」のような本文中の普通の段落が誤って番号を付けられることはありません。自動判定はインデックスの反映待ちが必要で多少遅れますが問題ありません。右クリックで設定したキャプションはこのスイッチの影響を受けず、すぐ反映されます",
+        "set.dead.title": "リンク切れ参照の扱い", "set.dead.desc": "削除済みブロック、またはキャプションを解除したブロックを指す参照です。既定の「何もしない」では参照はそのまま残り、ブロックを削除しても Ctrl+Alt+Z で元の ID のまま復元でき、参照もつながります。「赤くマーク」は本文に赤い取り消し線を引きます（内容が壊れたように見えます）。「テキストに変換」は参照が完全に失われ元に戻せず、実行まで 10 秒待ちます",
+        "set.dead.off": "何もしない（推奨）", "set.dead.mark": "赤くマークし、参照は残す",
+        "set.dead.text": "赤い取り消し線テキストに変換（元に戻せません）", "set.center.title": "キャプションを中央揃え",
+        "set.center.desc": "振り直し時に「図 N …」「表 N …」のキャプション段落を中央揃えにします", "set.bg.title": "キャプションの背景色",
+        "set.bg.desc": "「図 N …」「表 N …」のキャプションに薄い背景色を付けます。ダークテーマでも読みやすくなります。自分で背景色を設定したものは変更しません", "set.bg.none": "なし",
+        "set.bg.faint": "ごく薄く", "set.bg.light": "薄く（既定）",
+        "set.bg.blue": "薄い青", "set.keys.title": "ショートカットのカスタマイズ",
+        "set.keys.desc": "入力欄をクリックしてから使いたいキーの組み合わせを押してください（Ctrl / Alt / ⌘ が必要）。Backspace で消去、Esc でキャンセル。設定 → キーマップ → プラグインにも同じ項目があり、どちらで変更しても構いません", "set.keys.insert": "相互参照を挿入",
+        "set.keys.renumber": "番号を振り直す", "set.keys.undo": "前回の振り直しを元に戻す",
+        "set.keys.redo": "やり直す", "set.keys.unset": "未設定",
+        "set.keys.press": "キーを押してください…", "set.keys.tip": "クリックしてキーを押す",
+        "set.undo.title": "元に戻せる回数", "set.undo.desc": "振り直しを何回分まで戻せるか（1〜50）。SiYuan の Ctrl+Z はプラグインの書き込みを戻せないため、独自に記録します",
+        "set.restore.title": "リンク切れ参照を復元", "set.restore.desc": "以前「テキストに変換」で失われた参照を ((ブロックID \"アンカー\")) に戻します。対象ブロックが削除済みのものは自動で飛ばします",
+        "set.restore.btn": "この文書を復元", "set.restore.busy": "復元中…",
+        "set.debug.title": "診断ログ（トラブルシューティング）", "set.debug.desc": "オンにするとすべてのネットワーク通信を記録し、ws-log.json / err-log.json に書き出します。調査時だけオンにしてください。SiYuan が遅くなります",
+        "msg.loadErr": "siyuan-xref の読み込みに失敗しました：{0}（詳細は data/storage/petal/siyuan-xref/err-log.json）", "msg.error": "siyuan-xref エラー：{0}",
+        "msg.noDoc": "siyuan-xref：現在の文書を取得できません", "msg.busy": "siyuan-xref：振り直しが終わらないため、今回は実行しませんでした。しばらくして再試行してください",
+        "msg.renumbering": "siyuan-xref：振り直し中です。しばらくしてから再試行してください", "msg.setDone": "{0}のキャプションに設定しました{1}",
+        "msg.nBlocks": "（{0} か所）", "msg.attrWritten": "siyuan-xref：属性を保存しました。番号はまもなく反映されます（{0} か所）",
+        "msg.addFail": "siyuan-xref：図 / 表の隣にキャプション段落を挿入できませんでした。再試行してください", "msg.addPending": "siyuan-xref：キャプション段落を挿入しました。番号はまもなく反映されます",
+        "msg.addDone": "{0}に{1}のキャプションを追加しました{2}。そのまま説明を書けます", "msg.notIndexed": "siyuan-xref：このブロックはまだインデックスされていません。しばらくして再試行してください",
+        "msg.wrongSide": "siyuan-xref：キャプションは{0}の{1}ではなく反対側にあります。そのキャプション段落を右クリックして「キャプションを解除」を選んでください", "msg.noNeighbor": "siyuan-xref：この{0}の{1}に隣接するキャプション段落が見つかりません。キャプション段落自体を右クリックして解除してください",
+        "msg.cancelled": "キャプションを解除しました{0}{1}", "msg.cancelWrap": "（{0}）",
+        "msg.cancel.none": "番号の接頭辞はありませんでした", "msg.cancel.names": "ブロック名を {0} か所クリアしました",
+        "msg.cancel.stuck": "{0} か所の番号接頭辞を削除できませんでした。その行を手動で消してから再試行してください", "msg.cancel.orphan": "他に {0} か所の参照が古い番号のままです",
+        "msg.sep": "、", "msg.settingsSaved": "siyuan-xref：設定を保存しました",
+        "msg.noTargets": "siyuan-xref：この文書には図 / 表 / 式が見つかりませんでした", "msg.emptyEq": "siyuan-xref：{0} 個の数式ブロックが空です（\\tag だけが残っています）。数式が失われていないか確認してください",
+        "msg.renumbered": "siyuan-xref：{0} 件を振り直し、参照を {1} か所更新しました", "msg.burned": "、さらに {0} か所のリンク切れ参照を赤い取り消し線テキストに変換しました",
+        "msg.deadGrace": "、{0} か所のリンク切れ参照を検出しました（{1} 秒後も復旧しない場合のみテキスト化）", "msg.deadFound": "、{0} か所のリンク切れ参照を検出しました",
+        "msg.deadPainted": "siyuan-xref：{0} か所の相互参照がリンク切れです（対象ブロックが削除済み、またはキャプションが解除済み）。本文内で赤くマークしました", "msg.noUndo": "siyuan-xref：元に戻せる振り直し履歴がありません",
+        "msg.undoDone": "siyuan-xref：{0} 回目の振り直しを元に戻しました（{1} か所{2}{3}）。残り {4} 回まで戻せます", "msg.undoRebuilt": "、削除済みのブロックを {0} 個復元しました",
+        "msg.undoMiss": "、{0} か所のブロックは既に存在しません", "msg.noRedo": "siyuan-xref：やり直せる振り直し履歴がありません",
+        "msg.redoDone": "siyuan-xref：やり直しました。履歴は {0} 回分{1}", "msg.redoRebuilt": "（{0} ブロックを復元）",
+        "msg.noArchive": "siyuan-xref：復元できる記録がありません（dead-fix-log.json が空）", "msg.noDocDead": "siyuan-xref：この文書にはリンク切れ参照の記録がありません",
+        "msg.restored": "siyuan-xref：{0} か所の参照を復元しました（{1} 個のブロック）{2}", "msg.restoreMiss": "、{0} 個のブロックが見つからないか対象が削除済みです",
+        "msg.readFail": "siyuan-xref の読み込みに失敗しました：{0}", "msg.insertFail": "挿入に失敗しました：{0}",
+        "picker.title": "相互参照を挿入", "picker.ph": "番号やキャプションで検索 · ↑↓ で選択 · Enter で挿入 · Esc で閉じる",
+        "picker.empty": "該当なし", "picker.all": "すべて",
+        "picker.allSec": "すべての見出し", "picker.secTip": "特定の見出しの下の図 / 表 / 式だけを表示します（子見出しを含む）",
+        "picker.secNone": "（見出しなし）", "picker.noAnchor": "siyuan-xref：この段落を特定できず、参照を挿入しませんでした。対象の段落にカーソルを置いて再試行してください",
+        "picker.noSlash": "siyuan-xref：/xref を入力した位置を特定できず、挿入を中止しました。対象の段落にカーソルを置いて再試行してください",
+    },
+    ko: {
+        // 한국어（思源 ko）
+        "label.fig": "그림", "label.tab": "표",
+        "label.eq": "식", "dead.text": "끊긴 참조",
+        "slash.xref.text": "상호 참조", "slash.xref.meta": "그림 / 표 / 식",
+        "slash.num.text": "그림·표 번호 다시 매기기", "slash.num.meta": "참조도 함께 갱신",
+        "cmd.insert": "상호 참조 삽입", "cmd.renumber": "그림·표 번호 다시 매기기",
+        "cmd.undo": "마지막 번호 매기기 취소", "cmd.redo": "번호 매기기 다시 실행",
+        "menu.setFig": "그림 캡션으로 지정", "menu.setTab": "표 캡션으로 지정",
+        "menu.clear": "캡션 해제", "menu.add": "{0}에 {1} 캡션 추가",
+        "menu.useNext": "{0} 단락을 {1} 캡션으로 지정", "menu.ref": "상호 참조 삽입…",
+        "menu.where.below": "아래", "menu.where.above": "위",
+        "menu.word.fig": "그림", "menu.word.tab": "표",
+        "noun.image": "이미지", "noun.table": "표",
+        "hint.table": "캡션: 표 셀 안에서는 지원하지 않습니다. 표 자체나 표 위의 캡션 단락을 마우스 오른쪽 버튼으로 클릭하세요", "hint.mixed": "캡션: 같은 종류의 블록을 선택하세요 (단락, 또는 이미지 한 장 / 표 하나)",
+        "hint.math": "캡션: 수식 블록은 번호가 자동으로 매겨지므로 캡션이 필요하지 않습니다", "hint.default": "캡션: 이미지 / 표 자체, 또는 그림 아래(표 위)의 캡션 단락을 마우스 오른쪽 버튼으로 클릭하세요",
+        "set.mode.title": "번호 매기기 방식", "set.mode.desc": "문서 전체 연속(그림 1, 그림 2) 또는 최상위 제목마다 새로 시작(그림 1-1, 그림 2-1)",
+        "set.mode.continuous": "전체 연속", "set.mode.chapter": "장마다",
+        "set.labels.title": "그림 / 표 / 식 라벨", "set.labels.desc": "번호 앞에 붙는 글자. 예: Figure / Table / Eq",
+        "set.refs.title": "번호를 다시 매길 때 참조도 갱신", "set.refs.desc": "((블록ID \"이전 앵커\"))를 모두 새 번호로 바꿉니다. 끄면 번호만 바뀌고 참조는 그대로 둡니다",
+        "set.auto.title": "자동 번호 매기기", "set.auto.desc": "입력을 멈추고 1.5초 후 번호를 다시 매기고 참조를 갱신합니다. 커서가 있는 블록에는 쓰지 않으므로 입력을 방해하지 않습니다",
+        "set.detect.title": "본문에서 캡션 자동 인식", "set.detect.desc": "「그림 3 ……」「표 2 ……」로 시작하는 단락을 캡션으로 보고 번호를 매깁니다. 끄면 마우스 오른쪽 메뉴로 지정한 캡션(custom-xref 속성)만 대상으로 하므로, 「그림 3에서 볼 수 있듯이」 같은 본문의 일반 단락이 잘못 번호 매겨지지 않습니다. 자동 인식은 색인 반영을 기다려야 해서 조금 늦지만 문제없습니다. 오른쪽 메뉴로 지정한 캡션은 이 스위치와 무관하게 즉시 적용됩니다",
+        "set.dead.title": "끊긴 참조 처리", "set.dead.desc": "삭제된 블록이나 캡션을 해제한 블록을 가리키는 참조입니다. 기본값 「그대로 두기」는 참조를 그대로 남기고, 블록을 삭제해도 Ctrl+Alt+Z로 원래 ID 그대로 복원되어 참조가 다시 연결됩니다. 「빨갛게 표시」는 본문에 빨간 취소선을 그어 내용이 손상된 것처럼 보입니다. 「텍스트로 변환」은 참조가 완전히 끊겨 되돌릴 수 없고, 실행까지 10초를 기다립니다",
+        "set.dead.off": "그대로 두기 (권장)", "set.dead.mark": "빨갛게 표시하고 참조 유지",
+        "set.dead.text": "빨간 취소선 텍스트로 변환 (되돌릴 수 없음)", "set.center.title": "캡션 가운데 정렬",
+        "set.center.desc": "번호를 다시 매길 때 「그림 N …」「표 N …」 캡션 단락을 가운데 정렬합니다", "set.bg.title": "캡션 배경색",
+        "set.bg.desc": "「그림 N …」「표 N …」 캡션에 아주 옅은 배경색을 넣습니다. 어두운 테마에서도 잘 보입니다. 직접 배경색을 지정한 캡션은 건드리지 않습니다", "set.bg.none": "없음",
+        "set.bg.faint": "아주 옅게", "set.bg.light": "옅게 (기본)",
+        "set.bg.blue": "연한 파랑", "set.keys.title": "단축키 사용자 지정",
+        "set.keys.desc": "입력란을 클릭한 뒤 원하는 키 조합을 누르세요 (Ctrl / Alt / ⌘ 필수). Backspace로 지우고 Esc로 취소합니다. 설정 → 단축키 → 플러그인에도 같은 항목이 있으며 어느 쪽에서 바꿔도 됩니다", "set.keys.insert": "상호 참조 삽입",
+        "set.keys.renumber": "번호 다시 매기기", "set.keys.undo": "마지막 번호 매기기 취소",
+        "set.keys.redo": "다시 실행", "set.keys.unset": "설정 안 됨",
+        "set.keys.press": "키를 누르세요…", "set.keys.tip": "클릭한 뒤 키를 누르세요",
+        "set.undo.title": "되돌리기 단계", "set.undo.desc": "번호 매기기를 몇 회까지 되돌릴 수 있는지 (1~50). SiYuan의 Ctrl+Z는 플러그인이 쓴 내용을 되돌리지 못하므로 따로 기록합니다",
+        "set.restore.title": "끊긴 참조 복원", "set.restore.desc": "예전에 「텍스트로 변환」으로 끊긴 참조를 ((블록ID \"앵커\"))로 되돌립니다. 대상 블록이 삭제된 경우는 자동으로 건너뜁니다",
+        "set.restore.btn": "이 문서 복원", "set.restore.busy": "복원 중…",
+        "set.debug.title": "진단 로그 (문제 해결용)", "set.debug.desc": "켜면 모든 네트워크 요청을 가로채 ws-log.json / err-log.json에 기록합니다. 문제를 찾을 때만 켜세요. SiYuan이 느려집니다",
+        "msg.loadErr": "siyuan-xref 로드 실패: {0} (자세한 내용은 data/storage/petal/siyuan-xref/err-log.json)", "msg.error": "siyuan-xref 오류: {0}",
+        "msg.noDoc": "siyuan-xref: 현재 문서를 가져오지 못했습니다", "msg.busy": "siyuan-xref: 번호 매기기가 끝나지 않아 이번 작업을 실행하지 않았습니다. 잠시 후 다시 시도하세요",
+        "msg.renumbering": "siyuan-xref: 번호를 매기는 중입니다. 잠시 후 다시 시도하세요", "msg.setDone": "{0} 캡션으로 지정했습니다{1}",
+        "msg.nBlocks": " ({0}곳)", "msg.attrWritten": "siyuan-xref: 속성을 저장했습니다. 번호는 곧 반영됩니다 ({0}곳)",
+        "msg.addFail": "siyuan-xref: 그림 / 표 옆에 캡션 단락을 넣지 못했습니다. 다시 시도하세요", "msg.addPending": "siyuan-xref: 캡션 단락을 넣었습니다. 번호는 곧 반영됩니다",
+        "msg.addDone": "{0}에 {1} 캡션을 추가했습니다{2}. 바로 설명을 입력할 수 있습니다", "msg.notIndexed": "siyuan-xref: 이 블록은 아직 색인되지 않았습니다. 잠시 후 다시 시도하세요",
+        "msg.wrongSide": "siyuan-xref: 캡션은 {0} {1}이 아니라 반대쪽에 있습니다. 그 캡션 단락을 마우스 오른쪽 버튼으로 클릭해 「캡션 해제」를 선택하세요", "msg.noNeighbor": "siyuan-xref: 이 {0} {1}에 붙어 있는 캡션 단락을 찾지 못했습니다. 캡션 단락 자체를 마우스 오른쪽 버튼으로 클릭해 해제하세요",
+        "msg.cancelled": "캡션을 해제했습니다{0}{1}", "msg.cancelWrap": " ({0})",
+        "msg.cancel.none": "번호 접두사가 원래 없었습니다", "msg.cancel.names": "블록 이름 {0}곳을 지웠습니다",
+        "msg.cancel.stuck": "{0}곳의 번호 접두사를 지우지 못했습니다. 그 줄을 직접 지운 뒤 다시 시도하세요", "msg.cancel.orphan": "참조 {0}곳이 아직 이전 번호를 표시하고 있습니다",
+        "msg.sep": ", ", "msg.settingsSaved": "siyuan-xref: 설정을 저장했습니다",
+        "msg.noTargets": "siyuan-xref: 이 문서에서 그림 / 표 / 수식을 찾지 못했습니다", "msg.emptyEq": "siyuan-xref: 수식 블록 {0}개가 비어 있습니다 (\\tag만 남음). 수식이 사라지지 않았는지 확인하세요",
+        "msg.renumbered": "siyuan-xref: {0}개 항목의 번호를 다시 매기고 참조 {1}곳을 갱신했습니다", "msg.burned": ", 끊긴 참조 {0}곳을 빨간 취소선 텍스트로 변환했습니다",
+        "msg.deadGrace": ", 끊긴 참조 {0}곳을 발견했습니다 ({1}초 후에도 복구되지 않으면 텍스트로 변환)", "msg.deadFound": ", 끊긴 참조 {0}곳을 발견했습니다",
+        "msg.deadPainted": "siyuan-xref: 상호 참조 {0}곳이 끊겼습니다 (대상 블록이 삭제되었거나 캡션이 해제됨). 본문에 빨갛게 표시했습니다", "msg.noUndo": "siyuan-xref: 되돌릴 번호 매기기 기록이 없습니다",
+        "msg.undoDone": "siyuan-xref: {0}번째 번호 매기기를 되돌렸습니다 ({1}곳{2}{3}). {4}단계 더 되돌릴 수 있습니다", "msg.undoRebuilt": ", 삭제된 블록 {0}개를 복원했습니다",
+        "msg.undoMiss": ", 블록 {0}곳이 더 이상 존재하지 않습니다", "msg.noRedo": "siyuan-xref: 다시 실행할 번호 매기기 기록이 없습니다",
+        "msg.redoDone": "siyuan-xref: 다시 실행했습니다. 되돌리기 기록 {0}단계{1}", "msg.redoRebuilt": " (블록 {0}개 복원)",
+        "msg.noArchive": "siyuan-xref: 복원할 기록이 없습니다 (dead-fix-log.json이 비어 있음)", "msg.noDocDead": "siyuan-xref: 이 문서에는 끊긴 참조 기록이 없습니다",
+        "msg.restored": "siyuan-xref: 참조 {0}곳을 복원했습니다 (블록 {1}개){2}", "msg.restoreMiss": "; 블록 {0}개를 찾을 수 없거나 대상이 삭제되었습니다",
+        "msg.readFail": "siyuan-xref 읽기 실패: {0}", "msg.insertFail": "삽입 실패: {0}",
+        "picker.title": "상호 참조 삽입", "picker.ph": "번호나 캡션으로 검색 · ↑↓ 선택 · Enter 삽입 · Esc 닫기",
+        "picker.empty": "일치하는 항목 없음", "picker.all": "전체",
+        "picker.allSec": "전체 제목", "picker.secTip": "특정 제목 아래의 그림 / 표 / 식만 표시합니다 (하위 제목 포함)",
+        "picker.secNone": "(제목 없음)", "picker.noAnchor": "siyuan-xref: 이 단락을 찾지 못해 참조를 삽입하지 않았습니다. 대상 단락에 커서를 두고 다시 시도하세요",
+        "picker.noSlash": "siyuan-xref: /xref를 입력한 위치를 찾지 못해 삽입을 취소했습니다. 대상 단락에 커서를 두고 다시 시도하세요",
+    },
+    de: {
+        // Deutsch（思源 de）：合成词用「名词: …」/「… als Beschriftung」避免 Abbildungbeschriftung 这类拼写错误
+        "label.fig": "Abb.", "label.tab": "Tab.",
+        "label.eq": "Gl.", "dead.text": "defekter Verweis",
+        "slash.xref.text": "Querverweis", "slash.xref.meta": "Abbildung / Tabelle / Gleichung",
+        "slash.num.text": "Nummerierung neu vergeben", "slash.num.meta": "Verweise mit aktualisieren",
+        "cmd.insert": "Querverweis einfügen", "cmd.renumber": "Nummerierung neu vergeben",
+        "cmd.undo": "Letzte Nummerierung rückgängig", "cmd.redo": "Nummerierung wiederholen",
+        "menu.setFig": "Als Abbildungsbeschriftung setzen", "menu.setTab": "Als Tabellenbeschriftung setzen",
+        "menu.clear": "Beschriftung entfernen", "menu.add": "{1}: Beschriftung {0} hinzufügen",
+        "menu.useNext": "Absatz {0} als Beschriftung für {1} verwenden", "menu.ref": "Querverweis einfügen…",
+        "menu.where.below": "unterhalb", "menu.where.above": "oberhalb",
+        "menu.word.fig": "Abbildung", "menu.word.tab": "Tabelle",
+        "noun.image": "des Bildes", "noun.table": "der Tabelle",
+        "hint.table": "Beschriftung: In Tabellenzellen nicht möglich – klicken Sie mit der rechten Maustaste auf die Tabelle selbst oder auf die Beschriftung oberhalb der Tabelle", "hint.mixed": "Beschriftung: Bitte Blöcke derselben Art auswählen (Absätze oder ein einzelnes Bild / eine einzelne Tabelle)",
+        "hint.math": "Beschriftung: Gleichungsblöcke werden automatisch nummeriert, eine Beschriftung ist nicht nötig", "hint.default": "Beschriftung: Klicken Sie mit der rechten Maustaste auf das Bild / die Tabelle selbst oder auf den Beschriftungsabsatz unter einer Abbildung (über einer Tabelle)",
+        "set.mode.title": "Nummerierungsmodus", "set.mode.desc": "Durchlaufend im ganzen Dokument (Abb. 1, Abb. 2) oder neu ab jeder Überschriftenebene (Abb. 1-1, Abb. 2-1)",
+        "set.mode.continuous": "Durchlaufend", "set.mode.chapter": "Pro Kapitel",
+        "set.labels.title": "Beschriftungstexte für Abbildung / Tabelle / Gleichung", "set.labels.desc": "Text vor der Nummer, z. B. Abb. / Tab. / Gl.",
+        "set.refs.title": "Verweise beim Neuvergeben aktualisieren", "set.refs.desc": "Schreibt jedes ((Block-ID \"alter Anker\")) auf die neue Nummer um. Ausschalten ändert nur die Nummern und lässt Verweise unberührt.",
+        "set.auto.title": "Automatisch neu nummerieren", "set.auto.desc": "Nummeriert 1,5 s nach dem letzten Tastendruck neu und aktualisiert die Verweise. Der Block mit dem Cursor wird nie beschrieben, damit die Eingabe nicht unterbrochen wird.",
+        "set.detect.title": "Beschriftungen aus dem Text erkennen", "set.detect.desc": "Ein Absatz, der mit Abb. 3 / Figure 3 / Tab. 2 / Tabelle 2 beginnt, gilt als Beschriftung. Ausschalten akzeptiert nur Beschriftungen aus dem Kontextmenü (Attribut custom-xref), sodass ein normaler Satz wie „wie Abb. 3 zeigt“ nie umnummeriert wird. Die Erkennung muss auf den Index warten, was in Ordnung ist; über das Menü gesetzte Beschriftungen sind davon nicht betroffen und wirken sofort.",
+        "set.dead.title": "Defekte Verweise", "set.dead.desc": "Ein Verweis auf einen gelöschten Block oder auf einen Block, dessen Beschriftung entfernt wurde. Standard „unverändert lassen“: der Verweis bleibt stehen, und Ctrl+Alt+Z baut den gelöschten Block mit seiner ursprünglichen ID wieder auf, sodass der Verweis wieder greift. „Rot markieren“ färbt ihn rot mit Durchstreichung, was leicht wie eine Beschädigung des Inhalts aussieht. „In Text umwandeln“ ist unwiderruflich und wartet 10 s vor der Ausführung.",
+        "set.dead.off": "Unverändert lassen (empfohlen)", "set.dead.mark": "Rot markieren, Verweis behalten",
+        "set.dead.text": "In roten durchgestrichenen Text umwandeln (unwiderruflich)", "set.center.title": "Beschriftungen zentrieren",
+        "set.center.desc": "Zentriert beim Neuvergeben jeden Beschriftungsabsatz von Abbildung / Tabelle", "set.bg.title": "Hintergrund der Beschriftung",
+        "set.bg.desc": "Legt einen sehr hellen Hintergrund hinter Beschriftungsabsätze; auch in dunklen Themes lesbar. Selbst gesetzte Hintergründe bleiben unverändert.", "set.bg.none": "Keiner",
+        "set.bg.faint": "Sehr hell", "set.bg.light": "Hell (Standard)",
+        "set.bg.blue": "Hellblau", "set.keys.title": "Eigene Tastenkürzel",
+        "set.keys.desc": "Klicken Sie in ein Feld und drücken Sie die gewünschte Kombination (Ctrl / Alt / ⌘ erforderlich). Backspace löscht, Esc bricht ab. Dieselben Kürzel stehen auch unter Einstellungen → Tastenkürzel → Plugins; beide Stellen funktionieren.", "set.keys.insert": "Querverweis einfügen",
+        "set.keys.renumber": "Neu nummerieren", "set.keys.undo": "Letzte Nummerierung rückgängig",
+        "set.keys.redo": "Wiederholen", "set.keys.unset": "nicht gesetzt",
+        "set.keys.press": "Tasten drücken…", "set.keys.tip": "Klicken, dann Tasten drücken",
+        "set.undo.title": "Rückgängig-Tiefe", "set.undo.desc": "Wie viele Nummerierungsläufe rückgängig gemacht werden können (1–50). Das Ctrl+Z von SiYuan kann API-Schreibvorgänge nicht zurücknehmen, daher führt das Plugin einen eigenen Stapel.",
+        "set.restore.title": "Defekte Verweise wiederherstellen", "set.restore.desc": "Wandelt Verweise, die zuvor in reinen Text umgewandelt wurden, wieder in ((Block-ID \"Anker\")) um. Blöcke ohne Ziel werden übersprungen.",
+        "set.restore.btn": "Dieses Dokument wiederherstellen", "set.restore.busy": "Wird wiederhergestellt…",
+        "set.debug.title": "Diagnoseprotokoll (Fehlersuche)", "set.debug.desc": "Fängt jede Netzwerkanfrage ab und schreibt ws-log.json / err-log.json. Nur zur Fehlersuche einschalten – es bremst SiYuan aus.",
+        "msg.loadErr": "siyuan-xref konnte nicht geladen werden: {0} (siehe data/storage/petal/siyuan-xref/err-log.json)", "msg.error": "siyuan-xref-Fehler: {0}",
+        "msg.noDoc": "siyuan-xref: kein aktuelles Dokument", "msg.busy": "siyuan-xref: die Nummerierung wurde nie fertig, es wurde nichts ausgeführt – bitte erneut versuchen",
+        "msg.renumbering": "siyuan-xref: Nummerierung läuft, bitte warten", "msg.setDone": "{0} als Beschriftung gesetzt{1}",
+        "msg.nBlocks": " ({0} Blöcke)", "msg.attrWritten": "siyuan-xref: Attribut gespeichert, die Nummern folgen gleich ({0})",
+        "msg.addFail": "siyuan-xref: neben der Abbildung / Tabelle konnte kein Beschriftungsabsatz eingefügt werden, bitte erneut versuchen", "msg.addPending": "siyuan-xref: Beschriftungsabsatz eingefügt, die Nummern folgen gleich",
+        "msg.addDone": "{1}: Beschriftung {0} hinzugefügt{2}", "msg.notIndexed": "siyuan-xref: dieser Block ist noch nicht indexiert, bitte erneut versuchen",
+        "msg.wrongSide": "siyuan-xref: die Beschriftung steht auf der anderen Seite, nicht {1} der {0}. Klicken Sie mit der rechten Maustaste auf diesen Beschriftungsabsatz und wählen Sie „Beschriftung entfernen“", "msg.noNeighbor": "siyuan-xref: kein Beschriftungsabsatz direkt {1} ({0}). Klicken Sie mit der rechten Maustaste auf den Beschriftungsabsatz selbst",
+        "msg.cancelled": "Beschriftung entfernt{0}{1}", "msg.cancelWrap": " ({0})",
+        "msg.cancel.none": "es gab keine führende Nummer", "msg.cancel.names": "{0} Blockname(n) gelöscht",
+        "msg.cancel.stuck": "{0} führende Nummer(n) konnten nicht entfernt werden – löschen Sie das Präfix von Hand und versuchen Sie es erneut", "msg.cancel.orphan": "{0} Verweis(e) zeigen noch die alte Nummer",
+        "msg.sep": ", ", "msg.settingsSaved": "siyuan-xref: Einstellungen gespeichert",
+        "msg.noTargets": "siyuan-xref: in diesem Dokument wurden keine Abbildungen, Tabellen oder Gleichungen gefunden", "msg.emptyEq": "siyuan-xref: {0} Gleichungsblock/-blöcke sind leer (nur \\tag übrig) – prüfen Sie, ob die Formel verloren ging",
+        "msg.renumbered": "siyuan-xref: {0} Beschriftung(en) neu nummeriert, {1} Verweis(e) aktualisiert", "msg.burned": ", {0} defekte Verweis(e) in roten durchgestrichenen Text umgewandelt",
+        "msg.deadGrace": ", {0} defekte Verweis(e) gefunden (Umwandlung in Text erst nach {1} s)", "msg.deadFound": ", {0} defekte Verweis(e) gefunden",
+        "msg.deadPainted": "siyuan-xref: {0} Querverweis(e) sind defekt (Ziel gelöscht oder Beschriftung entfernt) und im Dokument rot markiert", "msg.noUndo": "siyuan-xref: nichts rückgängig zu machen",
+        "msg.undoDone": "siyuan-xref: Nummerierungslauf {0} rückgängig gemacht ({1} Änderung(en){2}{3}), {4} Schritt(e) übrig", "msg.undoRebuilt": ", {0} gelöschte Blöcke wiederhergestellt",
+        "msg.undoMiss": ", {0} Block/Blöcke existieren nicht mehr", "msg.noRedo": "siyuan-xref: nichts zu wiederholen",
+        "msg.redoDone": "siyuan-xref: wiederholt, Rückgängig-Stapel {0} Schritt(e){1}", "msg.redoRebuilt": " ({0} Block/Blöcke wiederhergestellt)",
+        "msg.noArchive": "siyuan-xref: nichts wiederherzustellen (dead-fix-log.json ist leer)", "msg.noDocDead": "siyuan-xref: für dieses Dokument sind keine defekten Verweise erfasst",
+        "msg.restored": "siyuan-xref: {0} Verweis(e) in {1} Block/Blöcken wiederhergestellt{2}", "msg.restoreMiss": "; {0} Block/Blöcke fehlen oder das Ziel wurde bereits gelöscht",
+        "msg.readFail": "siyuan-xref: Lesen fehlgeschlagen: {0}", "msg.insertFail": "Einfügen fehlgeschlagen: {0}",
+        "picker.title": "Querverweis einfügen", "picker.ph": "Nach Nummer oder Beschriftung suchen · ↑↓ auswählen · Enter einfügen · Esc schließen",
+        "picker.empty": "Keine Treffer", "picker.all": "Alle",
+        "picker.allSec": "Alle Überschriften", "picker.secTip": "Nur die Abbildungen / Tabellen / Gleichungen unter einer Überschrift zeigen (inkl. Unterüberschriften)",
+        "picker.secNone": "(ohne Überschrift)", "picker.noAnchor": "siyuan-xref: dieser Absatz wurde nicht gefunden, nichts eingefügt. Setzen Sie den Cursor in den Zielabsatz und versuchen Sie es erneut",
+        "picker.noSlash": "siyuan-xref: die Stelle von /xref wurde nicht gefunden, Einfügen abgebrochen. Setzen Sie den Cursor in den Zielabsatz und versuchen Sie es erneut",
+    },
+    fr: {
+        // Français（思源 fr）
+        "label.fig": "Fig.", "label.tab": "Tab.",
+        "label.eq": "Éq.", "dead.text": "référence cassée",
+        "slash.xref.text": "Référence croisée", "slash.xref.meta": "figure / tableau / équation",
+        "slash.num.text": "Renuméroter les légendes", "slash.num.meta": "actualiser aussi les références",
+        "cmd.insert": "Insérer une référence croisée", "cmd.renumber": "Renuméroter les légendes",
+        "cmd.undo": "Annuler la dernière renumérotation", "cmd.redo": "Rétablir la renumérotation",
+        "menu.setFig": "Définir comme légende de figure", "menu.setTab": "Définir comme légende de tableau",
+        "menu.clear": "Supprimer la légende", "menu.add": "Ajouter une légende de {1} {0}",
+        "menu.useNext": "Utiliser le paragraphe {0} comme légende de {1}", "menu.ref": "Insérer une référence croisée…",
+        "menu.where.below": "en dessous", "menu.where.above": "au-dessus",
+        "menu.word.fig": "figure", "menu.word.tab": "tableau",
+        "noun.image": "de la figure", "noun.table": "du tableau",
+        "hint.table": "Légendes : impossible dans une cellule de tableau — cliquez avec le bouton droit sur le tableau lui-même ou sur la légende au-dessus", "hint.mixed": "Légendes : sélectionnez des blocs de même type (paragraphes, ou une seule image / un seul tableau)",
+        "hint.math": "Légendes : les blocs d'équation sont numérotés automatiquement, aucune légende n'est nécessaire", "hint.default": "Légendes : cliquez avec le bouton droit sur l'image / le tableau lui-même, ou sur le paragraphe de légende sous une figure (au-dessus d'un tableau)",
+        "set.mode.title": "Mode de numérotation", "set.mode.desc": "Continu sur tout le document (Fig. 1, Fig. 2) ou redémarrage à chaque titre de premier niveau (Fig. 1-1, Fig. 2-1)",
+        "set.mode.continuous": "Continu", "set.mode.chapter": "Par chapitre",
+        "set.labels.title": "Libellés figure / tableau / équation", "set.labels.desc": "Texte placé devant chaque numéro, par ex. Fig. / Tab. / Éq.",
+        "set.refs.title": "Actualiser les références lors de la renumérotation", "set.refs.desc": "Réécrit chaque ((id de bloc \"ancien ancrage\")) avec le nouveau numéro. Désactivez pour ne changer que les numéros et laisser les références intactes.",
+        "set.auto.title": "Renumérotation automatique", "set.auto.desc": "Renumérote et actualise les références 1,5 s après la dernière frappe. Le bloc contenant le curseur n'est jamais écrit, la saisie n'est donc pas interrompue.",
+        "set.detect.title": "Détecter les légendes dans le texte", "set.detect.desc": "Un paragraphe commençant par Fig. 3 / Tableau 2 est considéré comme une légende. Désactivez pour n'accepter que les légendes définies par le menu contextuel (attribut custom-xref), afin qu'une phrase ordinaire comme « comme le montre la Fig. 3 » ne soit jamais renumérotée. La détection doit attendre la mise à jour de l'index, ce qui ne pose pas de problème ; les légendes définies par le menu ne sont pas concernées et prennent effet immédiatement.",
+        "set.dead.title": "Références cassées", "set.dead.desc": "Une référence vers un bloc supprimé, ou vers un bloc dont la légende a été supprimée. Par défaut « ne rien faire » : la référence reste en place, et Ctrl+Alt+Z reconstruit le bloc supprimé avec son identifiant d'origine, ce qui rétablit la référence. « Marquer en rouge » la colore en rouge avec un texte barré, ce qui peut faire croire à un contenu endommagé. « Convertir en texte » est irréversible et attend 10 s avant d'agir.",
+        "set.dead.off": "Ne rien faire (recommandé)", "set.dead.mark": "Marquer en rouge, garder la référence",
+        "set.dead.text": "Convertir en texte rouge barré (irréversible)", "set.center.title": "Centrer les légendes",
+        "set.center.desc": "Centre chaque paragraphe de légende de figure / tableau lors de la renumérotation", "set.bg.title": "Fond des légendes",
+        "set.bg.desc": "Ajoute un fond très clair derrière les paragraphes de légende ; reste lisible dans les thèmes sombres. Les fonds que vous avez définis vous-même ne sont pas modifiés.", "set.bg.none": "Aucun",
+        "set.bg.faint": "Très clair", "set.bg.light": "Clair (par défaut)",
+        "set.bg.blue": "Bleu pâle", "set.keys.title": "Raccourcis personnalisés",
+        "set.keys.desc": "Cliquez dans un champ, puis appuyez sur la combinaison souhaitée (Ctrl / Alt / ⌘ requis). Retour arrière efface, Échap annule. Les mêmes raccourcis apparaissent dans Paramètres → Raccourcis → Plugins ; les deux endroits fonctionnent.", "set.keys.insert": "Insérer une référence",
+        "set.keys.renumber": "Renuméroter", "set.keys.undo": "Annuler la dernière renumérotation",
+        "set.keys.redo": "Rétablir", "set.keys.unset": "non défini",
+        "set.keys.press": "appuyez sur les touches…", "set.keys.tip": "Cliquez, puis appuyez sur les touches",
+        "set.undo.title": "Profondeur d'annulation", "set.undo.desc": "Nombre de renumérotations annulables (1–50). Le Ctrl+Z de SiYuan ne peut pas annuler les écritures de l'API, le plugin tient donc sa propre pile.",
+        "set.restore.title": "Restaurer les références cassées", "set.restore.desc": "Reconvertit en ((id de bloc \"ancrage\")) les références qui avaient été converties en texte brut. Les blocs dont la cible n'existe plus sont ignorés.",
+        "set.restore.btn": "Restaurer ce document", "set.restore.busy": "Restauration…",
+        "set.debug.title": "Journal de diagnostic (dépannage)", "set.debug.desc": "Intercepte toutes les requêtes réseau et écrit ws-log.json / err-log.json. À activer uniquement pendant un dépannage — cela ralentit SiYuan.",
+        "msg.loadErr": "échec du chargement de siyuan-xref : {0} (voir data/storage/petal/siyuan-xref/err-log.json)", "msg.error": "erreur siyuan-xref : {0}",
+        "msg.noDoc": "siyuan-xref : aucun document courant", "msg.busy": "siyuan-xref : la renumérotation ne s'est jamais terminée, rien n'a été fait — veuillez réessayer",
+        "msg.renumbering": "siyuan-xref : renumérotation en cours, veuillez patienter", "msg.setDone": "Défini comme légende de {0}{1}",
+        "msg.nBlocks": " ({0} blocs)", "msg.attrWritten": "siyuan-xref : attribut enregistré, les numéros suivront bientôt ({0})",
+        "msg.addFail": "siyuan-xref : impossible d'insérer un paragraphe de légende à côté de la figure / du tableau, veuillez réessayer", "msg.addPending": "siyuan-xref : paragraphe de légende inséré, les numéros suivront bientôt",
+        "msg.addDone": "Légende de {1} ajoutée {0}{2} — vous pouvez saisir la description", "msg.notIndexed": "siyuan-xref : ce bloc n'est pas encore indexé, veuillez réessayer",
+        "msg.wrongSide": "siyuan-xref : la légende se trouve de l'autre côté, pas {1} du {0}. Cliquez avec le bouton droit sur ce paragraphe de légende et choisissez « Supprimer la légende »", "msg.noNeighbor": "siyuan-xref : pas de paragraphe de légende juste {1} ({0}). Cliquez avec le bouton droit sur le paragraphe de légende lui-même pour le supprimer",
+        "msg.cancelled": "Légende supprimée{0}{1}", "msg.cancelWrap": " ({0})",
+        "msg.cancel.none": "il n'y avait aucun numéro en tête", "msg.cancel.names": "{0} nom(s) de bloc effacé(s)",
+        "msg.cancel.stuck": "{0} numéro(s) en tête n'ont pas pu être supprimés — supprimez ce préfixe à la main et réessayez", "msg.cancel.orphan": "{0} référence(s) affichent encore l'ancien numéro",
+        "msg.sep": ", ", "msg.settingsSaved": "siyuan-xref : paramètres enregistrés",
+        "msg.noTargets": "siyuan-xref : aucune figure, aucun tableau ni équation trouvé dans ce document", "msg.emptyEq": "siyuan-xref : {0} bloc(s) d'équation sont vides (seul \\tag reste) — vérifiez si la formule a été perdue",
+        "msg.renumbered": "siyuan-xref : {0} légende(s) renumérotée(s), {1} référence(s) actualisée(s)", "msg.burned": ", {0} référence(s) cassée(s) convertie(s) en texte rouge barré",
+        "msg.deadGrace": ", {0} référence(s) cassée(s) trouvée(s) (conversion en texte seulement après {1} s)", "msg.deadFound": ", {0} référence(s) cassée(s) trouvée(s)",
+        "msg.deadPainted": "siyuan-xref : {0} référence(s) croisée(s) sont cassées (cible supprimée ou légende retirée) et sont marquées en rouge dans le document", "msg.noUndo": "siyuan-xref : rien à annuler",
+        "msg.undoDone": "siyuan-xref : renumérotation {0} annulée ({1} modification(s){2}{3}), {4} étape(s) restante(s)", "msg.undoRebuilt": ", {0} bloc(s) supprimé(s) reconstruit(s)",
+        "msg.undoMiss": ", {0} bloc(s) n'existent plus", "msg.noRedo": "siyuan-xref : rien à rétablir",
+        "msg.redoDone": "siyuan-xref : rétabli, pile d'annulation {0} étape(s){1}", "msg.redoRebuilt": " ({0} bloc(s) reconstruit(s))",
+        "msg.noArchive": "siyuan-xref : rien à restaurer (dead-fix-log.json est vide)", "msg.noDocDead": "siyuan-xref : aucune référence cassée enregistrée pour ce document",
+        "msg.restored": "siyuan-xref : {0} référence(s) restaurée(s) dans {1} bloc(s){2}", "msg.restoreMiss": " ; {0} bloc(s) introuvable(s) ou cible déjà supprimée",
+        "msg.readFail": "échec de lecture de siyuan-xref : {0}", "msg.insertFail": "échec de l'insertion : {0}",
+        "picker.title": "Insérer une référence croisée", "picker.ph": "Rechercher par numéro ou légende · ↑↓ pour choisir · Entrée pour insérer · Échap pour fermer",
+        "picker.empty": "Aucun résultat", "picker.all": "Tout",
+        "picker.allSec": "Toutes les sections", "picker.secTip": "N'afficher que les figures / tableaux / équations sous un titre donné (sous-titres inclus)",
+        "picker.secNone": "(sans titre)", "picker.noAnchor": "siyuan-xref : ce paragraphe est introuvable, rien n'a été inséré. Placez le curseur dans le paragraphe cible et réessayez",
+        "picker.noSlash": "siyuan-xref : impossible de localiser l'emplacement de /xref, insertion annulée. Placez le curseur dans le paragraphe cible et réessayez",
+    },
+    es: {
+        // Español（思源 es）
+        "label.fig": "Fig.", "label.tab": "Tab.",
+        "label.eq": "Ec.", "dead.text": "referencia rota",
+        "slash.xref.text": "Referencia cruzada", "slash.xref.meta": "figura / tabla / ecuación",
+        "slash.num.text": "Renumerar leyendas", "slash.num.meta": "actualizar también las referencias",
+        "cmd.insert": "Insertar referencia cruzada", "cmd.renumber": "Renumerar leyendas",
+        "cmd.undo": "Deshacer la última renumeración", "cmd.redo": "Rehacer la renumeración",
+        "menu.setFig": "Establecer como leyenda de figura", "menu.setTab": "Establecer como leyenda de tabla",
+        "menu.clear": "Quitar leyenda", "menu.add": "Añadir una leyenda de {1} {0}",
+        "menu.useNext": "Usar el párrafo {0} como leyenda de {1}", "menu.ref": "Insertar referencia cruzada…",
+        "menu.where.below": "debajo", "menu.where.above": "encima",
+        "menu.word.fig": "figura", "menu.word.tab": "tabla",
+        "noun.image": "imagen", "noun.table": "tabla",
+        "hint.table": "Leyendas: no disponible dentro de una celda de tabla — haz clic derecho sobre la tabla o sobre la leyenda situada encima", "hint.mixed": "Leyendas: selecciona bloques del mismo tipo (párrafos, o una sola imagen / una sola tabla)",
+        "hint.math": "Leyendas: los bloques de ecuación se numeran automáticamente, no necesitan leyenda", "hint.default": "Leyendas: haz clic derecho sobre la imagen / tabla, o sobre el párrafo de leyenda debajo de una figura (encima de una tabla)",
+        "set.mode.title": "Modo de numeración", "set.mode.desc": "Continuo en todo el documento (Fig. 1, Fig. 2) o reiniciando en cada título de primer nivel (Fig. 1-1, Fig. 2-1)",
+        "set.mode.continuous": "Continuo", "set.mode.chapter": "Por capítulo",
+        "set.labels.title": "Etiquetas de figura / tabla / ecuación", "set.labels.desc": "Texto que se escribe delante de cada número, p. ej. Fig. / Tab. / Ec.",
+        "set.refs.title": "Actualizar referencias al renumerar", "set.refs.desc": "Reescribe cada ((id de bloque \"ancla antigua\")) con el nuevo número. Desactívalo para cambiar solo los números y dejar las referencias intactas.",
+        "set.auto.title": "Renumeración automática", "set.auto.desc": "Renumera y actualiza las referencias 1,5 s después de dejar de escribir. Nunca escribe en el bloque donde está el cursor, así que no interrumpe la escritura.",
+        "set.detect.title": "Detectar leyendas por el texto", "set.detect.desc": "Un párrafo que empieza por Fig. 3 / Tabla 2 se considera una leyenda. Desactívalo para aceptar solo las leyendas definidas con el menú contextual (atributo custom-xref), de modo que una frase normal como «como muestra la Fig. 3» nunca se renumere. La detección debe esperar a que el índice se actualice, lo cual no es problema; las leyendas definidas desde el menú no se ven afectadas y surten efecto de inmediato.",
+        "set.dead.title": "Referencias rotas", "set.dead.desc": "Una referencia que apunta a un bloque eliminado, o a un bloque cuya leyenda se ha quitado. Por defecto «no hacer nada»: la referencia se queda como está y Ctrl+Alt+Z reconstruye el bloque eliminado con su ID original, con lo que la referencia vuelve a conectar. «Marcar en rojo» la pinta en rojo con tachado, lo que se confunde fácilmente con contenido dañado. «Convertir en texto» es irreversible y espera 10 s antes de actuar.",
+        "set.dead.off": "No hacer nada (recomendado)", "set.dead.mark": "Marcar en rojo, mantener la referencia",
+        "set.dead.text": "Convertir en texto rojo tachado (irreversible)", "set.center.title": "Centrar leyendas",
+        "set.center.desc": "Centra cada párrafo de leyenda de figura / tabla al renumerar", "set.bg.title": "Fondo de la leyenda",
+        "set.bg.desc": "Añade un fondo muy claro detrás de los párrafos de leyenda; sigue siendo legible en temas oscuros. Los fondos que hayas puesto tú mismo no se modifican.", "set.bg.none": "Ninguno",
+        "set.bg.faint": "Muy claro", "set.bg.light": "Claro (predeterminado)",
+        "set.bg.blue": "Azul pálido", "set.keys.title": "Atajos personalizados",
+        "set.keys.desc": "Haz clic en un campo y pulsa la combinación que quieras (se requiere Ctrl / Alt / ⌘). Retroceso borra, Esc cancela. Los mismos atajos aparecen en Ajustes → Atajos → Complementos; funciona en cualquiera de los dos sitios.", "set.keys.insert": "Insertar referencia",
+        "set.keys.renumber": "Renumerar", "set.keys.undo": "Deshacer la última renumeración",
+        "set.keys.redo": "Rehacer", "set.keys.unset": "sin definir",
+        "set.keys.press": "pulsa las teclas…", "set.keys.tip": "Haz clic y pulsa las teclas",
+        "set.undo.title": "Profundidad de deshacer", "set.undo.desc": "Cuántas renumeraciones se pueden deshacer (1–50). El Ctrl+Z de SiYuan no puede deshacer lo que escribe el complemento, por eso este guarda su propia pila.",
+        "set.restore.title": "Restaurar referencias rotas", "set.restore.desc": "Vuelve a convertir en ((id de bloque \"ancla\")) las referencias que antes se convirtieron en texto plano. Los bloques cuyo destino ya no existe se omiten.",
+        "set.restore.btn": "Restaurar este documento", "set.restore.busy": "Restaurando…",
+        "set.debug.title": "Registro de diagnóstico (solución de problemas)", "set.debug.desc": "Intercepta todas las peticiones de red y escribe ws-log.json / err-log.json. Actívalo solo mientras solucionas un problema: ralentiza SiYuan.",
+        "msg.loadErr": "siyuan-xref no se pudo cargar: {0} (consulta data/storage/petal/siyuan-xref/err-log.json)", "msg.error": "error de siyuan-xref: {0}",
+        "msg.noDoc": "siyuan-xref: no hay documento actual", "msg.busy": "siyuan-xref: la renumeración nunca terminó, no se hizo nada — inténtalo de nuevo",
+        "msg.renumbering": "siyuan-xref: renumeración en curso, espera por favor", "msg.setDone": "Establecido como leyenda de {0}{1}",
+        "msg.nBlocks": " ({0} bloques)", "msg.attrWritten": "siyuan-xref: atributo guardado, los números se añadirán en breve ({0})",
+        "msg.addFail": "siyuan-xref: no se pudo insertar un párrafo de leyenda junto a la figura / tabla, inténtalo de nuevo", "msg.addPending": "siyuan-xref: párrafo de leyenda insertado, los números se añadirán en breve",
+        "msg.addDone": "Leyenda de {1} añadida {0}{2} — ya puedes escribir la descripción", "msg.notIndexed": "siyuan-xref: este bloque aún no está indexado, inténtalo de nuevo",
+        "msg.wrongSide": "siyuan-xref: la leyenda está en el otro lado, no {1} de la {0}. Haz clic derecho sobre ese párrafo de leyenda y elige «Quitar leyenda»", "msg.noNeighbor": "siyuan-xref: no hay ningún párrafo de leyenda justo {1} ({0}). Haz clic derecho sobre el propio párrafo de leyenda para quitarla",
+        "msg.cancelled": "Leyenda quitada{0}{1}", "msg.cancelWrap": " ({0})",
+        "msg.cancel.none": "no había ningún número delante", "msg.cancel.names": "{0} nombre(s) de bloque borrado(s)",
+        "msg.cancel.stuck": "no se pudieron quitar {0} número(s) del principio — borra ese prefijo a mano y vuelve a intentarlo", "msg.cancel.orphan": "{0} referencia(s) siguen mostrando el número antiguo",
+        "msg.sep": ", ", "msg.settingsSaved": "siyuan-xref: ajustes guardados",
+        "msg.noTargets": "siyuan-xref: no se encontraron figuras, tablas ni ecuaciones en este documento", "msg.emptyEq": "siyuan-xref: {0} bloque(s) de ecuación están vacíos (solo queda \\tag) — comprueba si se perdió la fórmula",
+        "msg.renumbered": "siyuan-xref: {0} leyenda(s) renumerada(s), {1} referencia(s) actualizada(s)", "msg.burned": ", {0} referencia(s) rota(s) convertida(s) en texto rojo tachado",
+        "msg.deadGrace": ", {0} referencia(s) rota(s) encontrada(s) (se convierten a texto solo tras {1} s)", "msg.deadFound": ", {0} referencia(s) rota(s) encontrada(s)",
+        "msg.deadPainted": "siyuan-xref: {0} referencia(s) cruzada(s) están rotas (destino eliminado o leyenda quitada) y se han marcado en rojo en el documento", "msg.noUndo": "siyuan-xref: no hay nada que deshacer",
+        "msg.undoDone": "siyuan-xref: deshecha la renumeración {0} ({1} cambio(s){2}{3}), quedan {4} paso(s)", "msg.undoRebuilt": ", se reconstruyeron {0} bloque(s) eliminado(s)",
+        "msg.undoMiss": ", {0} bloque(s) ya no existen", "msg.noRedo": "siyuan-xref: no hay nada que rehacer",
+        "msg.redoDone": "siyuan-xref: rehecho, pila de deshacer {0} paso(s){1}", "msg.redoRebuilt": " ({0} bloque(s) reconstruido(s))",
+        "msg.noArchive": "siyuan-xref: no hay nada que restaurar (dead-fix-log.json está vacío)", "msg.noDocDead": "siyuan-xref: no hay referencias rotas registradas para este documento",
+        "msg.restored": "siyuan-xref: restauradas {0} referencia(s) en {1} bloque(s){2}", "msg.restoreMiss": "; {0} bloque(s) no encontrados o destino ya eliminado",
+        "msg.readFail": "error de lectura de siyuan-xref: {0}", "msg.insertFail": "error al insertar: {0}",
+        "picker.title": "Insertar referencia cruzada", "picker.ph": "Busca por número o leyenda · ↑↓ para elegir · Intro para insertar · Esc para cerrar",
+        "picker.empty": "Sin resultados", "picker.all": "Todo",
+        "picker.allSec": "Todas las secciones", "picker.secTip": "Mostrar solo las figuras / tablas / ecuaciones bajo un título (incluidos los subtítulos)",
+        "picker.secNone": "(sin título)", "picker.noAnchor": "siyuan-xref: no se encuentra este párrafo, no se insertó nada. Coloca el cursor en el párrafo de destino y vuelve a intentarlo",
+        "picker.noSlash": "siyuan-xref: no se encuentra dónde se escribió /xref, inserción cancelada. Coloca el cursor en el párrafo de destino y vuelve a intentarlo",
+    },
+    ru: {
+        // Русский（思源 ru）
+        "label.fig": "Рис.", "label.tab": "Табл.",
+        "label.eq": "Форм.", "dead.text": "битая ссылка",
+        "slash.xref.text": "Перекрёстная ссылка", "slash.xref.meta": "рисунок / таблица / формула",
+        "slash.num.text": "Перенумеровать подписи", "slash.num.meta": "обновить и ссылки",
+        "cmd.insert": "Вставить перекрёстную ссылку", "cmd.renumber": "Перенумеровать подписи",
+        "cmd.undo": "Отменить последнюю нумерацию", "cmd.redo": "Повторить нумерацию",
+        "menu.setFig": "Сделать подписью рисунка", "menu.setTab": "Сделать подписью таблицы",
+        "menu.clear": "Убрать подпись", "menu.add": "Добавить подпись {1} {0}",
+        "menu.useNext": "Использовать абзац {0} как подпись {1}", "menu.ref": "Вставить перекрёстную ссылку…",
+        "menu.where.below": "ниже", "menu.where.above": "выше",
+        "menu.word.fig": "рисунка", "menu.word.tab": "таблицы",
+        "noun.image": "изображения", "noun.table": "таблицы",
+        "hint.table": "Подписи: внутри ячейки таблицы недоступно — щёлкните правой кнопкой по самой таблице или по подписи над ней", "hint.mixed": "Подписи: выберите блоки одного типа (абзацы или одно изображение / одну таблицу)",
+        "hint.math": "Подписи: блоки формул нумеруются автоматически, подпись не нужна", "hint.default": "Подписи: щёлкните правой кнопкой по изображению / таблице или по абзацу подписи под рисунком (над таблицей)",
+        "set.mode.title": "Режим нумерации", "set.mode.desc": "Сквозная по всему документу (Рис. 1, Рис. 2) или с нового раздела на каждом заголовке первого уровня (Рис. 1-1, Рис. 2-1)",
+        "set.mode.continuous": "Сквозная", "set.mode.chapter": "По разделам",
+        "set.labels.title": "Метки рисунка / таблицы / формулы", "set.labels.desc": "Текст перед номером, например Рис. / Табл. / Форм.",
+        "set.refs.title": "Обновлять ссылки при перенумерации", "set.refs.desc": "Переписывает каждую ((ID блока \"старый якорь\")) на новый номер. Выключите, чтобы менять только номера и не трогать ссылки.",
+        "set.auto.title": "Автоматическая перенумерация", "set.auto.desc": "Перенумеровывает и обновляет ссылки через 1,5 с после остановки ввода. Блок с курсором никогда не изменяется, поэтому ввод не прерывается.",
+        "set.detect.title": "Распознавать подписи по тексту", "set.detect.desc": "Абзац, начинающийся с «Рис. 3 …» или «Табл. 2 …», считается подписью. Выключите, чтобы принимать только подписи, заданные через контекстное меню (атрибут custom-xref): тогда обычная фраза вроде «как видно из рис. 3» никогда не будет перенумерована. Распознавание ждёт обновления индекса, это нормально; подписи из меню от этого не зависят и срабатывают сразу.",
+        "set.dead.title": "Битые ссылки", "set.dead.desc": "Ссылка на удалённый блок или на блок, у которого убрана подпись. По умолчанию «не трогать»: ссылка остаётся как есть, а Ctrl+Alt+Z восстанавливает удалённый блок с прежним ID, и ссылка снова работает. «Только пометить красным» рисует красный зачёркнутый текст, что легко принять за повреждение содержимого. «Превратить в текст» необратимо и ждёт 10 с перед выполнением.",
+        "set.dead.off": "Не трогать (рекомендуется)", "set.dead.mark": "Пометить красным, ссылку сохранить",
+        "set.dead.text": "Превратить в красный зачёркнутый текст (необратимо)", "set.center.title": "Выравнивать подписи по центру",
+        "set.center.desc": "При перенумерации выравнивает абзацы подписей рисунков и таблиц по центру", "set.bg.title": "Фон подписи",
+        "set.bg.desc": "Добавляет очень светлый фон под абзацы подписей; читается и в тёмных темах. Свой фон, заданный вручную, не меняется.", "set.bg.none": "Нет",
+        "set.bg.faint": "Очень светлый", "set.bg.light": "Светлый (по умолчанию)",
+        "set.bg.blue": "Бледно-голубой", "set.keys.title": "Свои сочетания клавиш",
+        "set.keys.desc": "Щёлкните по полю и нажмите нужное сочетание (обязательно с Ctrl / Alt / ⌘). Backspace очищает, Esc отменяет. Эти же сочетания есть в Настройки → Сочетания клавиш → Плагины; менять можно в любом месте.", "set.keys.insert": "Вставить ссылку",
+        "set.keys.renumber": "Перенумеровать", "set.keys.undo": "Отменить последнюю нумерацию",
+        "set.keys.redo": "Повторить", "set.keys.unset": "не задано",
+        "set.keys.press": "нажмите сочетание…", "set.keys.tip": "Щёлкните и нажмите сочетание",
+        "set.undo.title": "Глубина отмены", "set.undo.desc": "Сколько прогонов нумерации можно отменить (1–50). Ctrl+Z в SiYuan не отменяет записи плагина, поэтому он ведёт свой стек.",
+        "set.restore.title": "Восстановить битые ссылки", "set.restore.desc": "Превращает ссылки, ранее превращённые в обычный текст, обратно в ((ID блока \"якорь\")). Блоки, чья цель уже удалена, пропускаются.",
+        "set.restore.btn": "Восстановить этот документ", "set.restore.busy": "Восстановление…",
+        "set.debug.title": "Журнал диагностики (для поиска проблем)", "set.debug.desc": "Перехватывает все сетевые запросы и пишет ws-log.json / err-log.json. Включайте только для поиска проблем — это замедляет SiYuan.",
+        "msg.loadErr": "siyuan-xref не удалось загрузить: {0} (см. data/storage/petal/siyuan-xref/err-log.json)", "msg.error": "ошибка siyuan-xref: {0}",
+        "msg.noDoc": "siyuan-xref: нет текущего документа", "msg.busy": "siyuan-xref: нумерация так и не завершилась, ничего не выполнено — попробуйте ещё раз",
+        "msg.renumbering": "siyuan-xref: идёт перенумерация, подождите", "msg.setDone": "Подпись {0} установлена{1}",
+        "msg.nBlocks": " ({0} шт.)", "msg.attrWritten": "siyuan-xref: атрибут записан, номера появятся чуть позже ({0})",
+        "msg.addFail": "siyuan-xref: не удалось вставить абзац подписи рядом с рисунком / таблицей, попробуйте ещё раз", "msg.addPending": "siyuan-xref: абзац подписи вставлен, номера появятся чуть позже",
+        "msg.addDone": "Подпись {1} добавлена {0}{2} — можно сразу писать описание", "msg.notIndexed": "siyuan-xref: этот блок ещё не проиндексирован, попробуйте позже",
+        "msg.wrongSide": "siyuan-xref: подпись находится с другой стороны, не {1} {0}. Щёлкните правой кнопкой по этому абзацу подписи и выберите «Убрать подпись»", "msg.noNeighbor": "siyuan-xref: рядом с {0} ({1}) нет абзаца подписи. Щёлкните правой кнопкой по самому абзацу подписи, чтобы убрать её",
+        "msg.cancelled": "Подпись убрана{0}{1}", "msg.cancelWrap": " ({0})",
+        "msg.cancel.none": "номера в начале не было", "msg.cancel.names": "Очищено названий блоков: {0}",
+        "msg.cancel.stuck": "Не удалось убрать номера в начале: {0} — удалите этот префикс вручную и повторите", "msg.cancel.orphan": "Ещё {0} ссылок показывают старый номер",
+        "msg.sep": ", ", "msg.settingsSaved": "siyuan-xref: настройки сохранены",
+        "msg.noTargets": "siyuan-xref: в этом документе не найдено рисунков, таблиц или формул", "msg.emptyEq": "siyuan-xref: {0} блок(ов) формул пусты (остался только \\tag) — проверьте, не потерялась ли формула",
+        "msg.renumbered": "siyuan-xref: перенумеровано подписей: {0}, обновлено ссылок: {1}", "msg.burned": ", {0} битых ссылок превращено в красный зачёркнутый текст",
+        "msg.deadGrace": ", найдено битых ссылок: {0} (в текст превращаются только через {1} с)", "msg.deadFound": ", найдено битых ссылок: {0}",
+        "msg.deadPainted": "siyuan-xref: {0} перекрёстных ссылок битые (цель удалена или подпись убрана) и помечены красным в документе", "msg.noUndo": "siyuan-xref: нечего отменять",
+        "msg.undoDone": "siyuan-xref: отменён прогон нумерации {0} (изменений: {1}{2}{3}), осталось шагов: {4}", "msg.undoRebuilt": ", восстановлено удалённых блоков: {0}",
+        "msg.undoMiss": ", блоков больше не существует: {0}", "msg.noRedo": "siyuan-xref: нечего повторять",
+        "msg.redoDone": "siyuan-xref: повторено, стек отмены: {0} шаг(ов){1}", "msg.redoRebuilt": " (восстановлено блоков: {0})",
+        "msg.noArchive": "siyuan-xref: нечего восстанавливать (dead-fix-log.json пуст)", "msg.noDocDead": "siyuan-xref: для этого документа нет записей о битых ссылках",
+        "msg.restored": "siyuan-xref: восстановлено ссылок: {0} (в {1} блоках){2}", "msg.restoreMiss": "; не найдено блоков или цель уже удалена: {0}",
+        "msg.readFail": "siyuan-xref: ошибка чтения: {0}", "msg.insertFail": "Ошибка вставки: {0}",
+        "picker.title": "Вставить перекрёстную ссылку", "picker.ph": "Поиск по номеру или подписи · ↑↓ — выбор · Enter — вставить · Esc — закрыть",
+        "picker.empty": "Нет совпадений", "picker.all": "Все",
+        "picker.allSec": "Все разделы", "picker.secTip": "Показывать только рисунки / таблицы / формулы под одним заголовком (включая подзаголовки)",
+        "picker.secNone": "(без заголовка)", "picker.noAnchor": "siyuan-xref: не удалось найти этот абзац, ничего не вставлено. Поставьте курсор в нужный абзац и повторите",
+        "picker.noSlash": "siyuan-xref: не удалось найти место ввода /xref, вставка отменена. Поставьте курсор в нужный абзац и повторите",
+    },
+    ptBR: {
+        // Português do Brasil（思源 pt-BR）
+        "label.fig": "Fig.", "label.tab": "Tab.",
+        "label.eq": "Eq.", "dead.text": "referência quebrada",
+        "slash.xref.text": "Referência cruzada", "slash.xref.meta": "figura / tabela / equação",
+        "slash.num.text": "Renumerar legendas", "slash.num.meta": "atualizar também as referências",
+        "cmd.insert": "Inserir referência cruzada", "cmd.renumber": "Renumerar legendas",
+        "cmd.undo": "Desfazer a última renumeração", "cmd.redo": "Refazer a renumeração",
+        "menu.setFig": "Definir como legenda de figura", "menu.setTab": "Definir como legenda de tabela",
+        "menu.clear": "Remover legenda", "menu.add": "Adicionar uma legenda de {1} {0}",
+        "menu.useNext": "Usar o parágrafo {0} como legenda de {1}", "menu.ref": "Inserir referência cruzada…",
+        "menu.where.below": "abaixo", "menu.where.above": "acima",
+        "menu.word.fig": "figura", "menu.word.tab": "tabela",
+        "noun.image": "imagem", "noun.table": "tabela",
+        "hint.table": "Legendas: não disponível dentro de uma célula de tabela — clique com o botão direito na própria tabela ou na legenda acima dela", "hint.mixed": "Legendas: selecione blocos do mesmo tipo (parágrafos, ou uma única imagem / uma única tabela)",
+        "hint.math": "Legendas: blocos de equação são numerados automaticamente, não precisam de legenda", "hint.default": "Legendas: clique com o botão direito na imagem / tabela, ou no parágrafo de legenda abaixo de uma figura (acima de uma tabela)",
+        "set.mode.title": "Modo de numeração", "set.mode.desc": "Contínuo no documento inteiro (Fig. 1, Fig. 2) ou reiniciando a cada título de primeiro nível (Fig. 1-1, Fig. 2-1)",
+        "set.mode.continuous": "Contínuo", "set.mode.chapter": "Por capítulo",
+        "set.labels.title": "Rótulos de figura / tabela / equação", "set.labels.desc": "Texto colocado antes de cada número, por exemplo Fig. / Tab. / Eq.",
+        "set.refs.title": "Atualizar referências ao renumerar", "set.refs.desc": "Reescreve cada ((id do bloco \"âncora antiga\")) com o novo número. Desative para mudar apenas os números e deixar as referências intactas.",
+        "set.auto.title": "Renumeração automática", "set.auto.desc": "Renumera e atualiza as referências 1,5 s depois de parar de digitar. Nunca grava no bloco em que está o cursor, então a digitação não é interrompida.",
+        "set.detect.title": "Detectar legendas pelo texto", "set.detect.desc": "Um parágrafo que começa com Fig. 3 / Tabela 2 é tratado como legenda. Desative para aceitar apenas legendas definidas pelo menu de contexto (atributo custom-xref), assim uma frase comum como \"como mostra a Fig. 3\" nunca é renumerada. A detecção precisa esperar o índice atualizar, o que não é problema; legendas definidas pelo menu não são afetadas e valem na hora.",
+        "set.dead.title": "Referências quebradas", "set.dead.desc": "Uma referência que aponta para um bloco excluído ou para um bloco cuja legenda foi removida. O padrão \"não fazer nada\": a referência fica como está e Ctrl+Alt+Z reconstrói o bloco excluído com o ID original, religando a referência. \"Marcar em vermelho\" pinta de vermelho com tachado, o que é fácil de confundir com conteúdo danificado. \"Converter em texto\" é irreversível e espera 10 s antes de agir.",
+        "set.dead.off": "Não fazer nada (recomendado)", "set.dead.mark": "Marcar em vermelho, manter a referência",
+        "set.dead.text": "Converter em texto vermelho tachado (irreversível)", "set.center.title": "Centralizar legendas",
+        "set.center.desc": "Centraliza cada parágrafo de legenda de figura / tabela ao renumerar", "set.bg.title": "Fundo da legenda",
+        "set.bg.desc": "Adiciona um fundo bem claro atrás dos parágrafos de legenda; continua legível em temas escuros. Fundos que você mesmo definiu não são alterados.", "set.bg.none": "Nenhum",
+        "set.bg.faint": "Muito claro", "set.bg.light": "Claro (padrão)",
+        "set.bg.blue": "Azul-claro", "set.keys.title": "Atalhos personalizados",
+        "set.keys.desc": "Clique em um campo e pressione a combinação desejada (Ctrl / Alt / ⌘ obrigatório). Backspace limpa, Esc cancela. Os mesmos atalhos aparecem em Configurações → Atalhos → Plugins; dá para alterar nos dois lugares.", "set.keys.insert": "Inserir referência",
+        "set.keys.renumber": "Renumerar", "set.keys.undo": "Desfazer a última renumeração",
+        "set.keys.redo": "Refazer", "set.keys.unset": "não definido",
+        "set.keys.press": "pressione as teclas…", "set.keys.tip": "Clique e pressione as teclas",
+        "set.undo.title": "Profundidade de desfazer", "set.undo.desc": "Quantas renumerações podem ser desfeitas (1–50). O Ctrl+Z do SiYuan não desfaz o que o plugin grava, por isso ele mantém a própria pilha.",
+        "set.restore.title": "Restaurar referências quebradas", "set.restore.desc": "Converte de volta em ((id do bloco \"âncora\")) as referências que foram transformadas em texto puro. Blocos cujo destino não existe mais são ignorados.",
+        "set.restore.btn": "Restaurar este documento", "set.restore.busy": "Restaurando…",
+        "set.debug.title": "Registro de diagnóstico (solução de problemas)", "set.debug.desc": "Intercepta todas as requisições de rede e grava ws-log.json / err-log.json. Ative só durante a investigação de problemas — deixa o SiYuan mais lento.",
+        "msg.loadErr": "falha ao carregar o siyuan-xref: {0} (veja data/storage/petal/siyuan-xref/err-log.json)", "msg.error": "erro do siyuan-xref: {0}",
+        "msg.noDoc": "siyuan-xref: nenhum documento atual", "msg.busy": "siyuan-xref: a renumeração nunca terminou, nada foi feito — tente novamente",
+        "msg.renumbering": "siyuan-xref: renumeração em andamento, aguarde", "msg.setDone": "Definido como legenda de {0}{1}",
+        "msg.nBlocks": " ({0} blocos)", "msg.attrWritten": "siyuan-xref: atributo salvo, os números virão em seguida ({0})",
+        "msg.addFail": "siyuan-xref: não foi possível inserir um parágrafo de legenda ao lado da figura / tabela, tente novamente", "msg.addPending": "siyuan-xref: parágrafo de legenda inserido, os números virão em seguida",
+        "msg.addDone": "Legenda de {1} adicionada {0}{2} — você já pode escrever a descrição", "msg.notIndexed": "siyuan-xref: este bloco ainda não está indexado, tente novamente",
+        "msg.wrongSide": "siyuan-xref: a legenda está do outro lado, não {1} da {0}. Clique com o botão direito nesse parágrafo de legenda e escolha \"Remover legenda\"", "msg.noNeighbor": "siyuan-xref: nenhum parágrafo de legenda logo {1} ({0}). Clique com o botão direito no próprio parágrafo de legenda para removê-la",
+        "msg.cancelled": "Legenda removida{0}{1}", "msg.cancelWrap": " ({0})",
+        "msg.cancel.none": "não havia número no início", "msg.cancel.names": "{0} nome(s) de bloco apagado(s)",
+        "msg.cancel.stuck": "não foi possível remover {0} número(s) do início — apague esse prefixo à mão e tente novamente", "msg.cancel.orphan": "{0} referência(s) ainda mostram o número antigo",
+        "msg.sep": ", ", "msg.settingsSaved": "siyuan-xref: configurações salvas",
+        "msg.noTargets": "siyuan-xref: nenhuma figura, tabela ou equação encontrada neste documento", "msg.emptyEq": "siyuan-xref: {0} bloco(s) de equação estão vazios (só sobrou \\tag) — verifique se a fórmula foi perdida",
+        "msg.renumbered": "siyuan-xref: {0} legenda(s) renumerada(s), {1} referência(s) atualizada(s)", "msg.burned": ", {0} referência(s) quebrada(s) convertida(s) em texto vermelho tachado",
+        "msg.deadGrace": ", {0} referência(s) quebrada(s) encontrada(s) (convertidas em texto só após {1} s)", "msg.deadFound": ", {0} referência(s) quebrada(s) encontrada(s)",
+        "msg.deadPainted": "siyuan-xref: {0} referência(s) cruzada(s) estão quebradas (destino excluído ou legenda removida) e foram marcadas em vermelho no documento", "msg.noUndo": "siyuan-xref: nada para desfazer",
+        "msg.undoDone": "siyuan-xref: renumeração {0} desfeita ({1} alteração(ões){2}{3}), restam {4} passo(s)", "msg.undoRebuilt": ", {0} bloco(s) excluído(s) reconstruído(s)",
+        "msg.undoMiss": ", {0} bloco(s) não existem mais", "msg.noRedo": "siyuan-xref: nada para refazer",
+        "msg.redoDone": "siyuan-xref: refeito, pilha de desfazer {0} passo(s){1}", "msg.redoRebuilt": " ({0} bloco(s) reconstruído(s))",
+        "msg.noArchive": "siyuan-xref: nada para restaurar (dead-fix-log.json está vazio)", "msg.noDocDead": "siyuan-xref: não há referências quebradas registradas para este documento",
+        "msg.restored": "siyuan-xref: {0} referência(s) restaurada(s) em {1} bloco(s){2}", "msg.restoreMiss": "; {0} bloco(s) não encontrados ou destino já excluído",
+        "msg.readFail": "falha de leitura do siyuan-xref: {0}", "msg.insertFail": "falha na inserção: {0}",
+        "picker.title": "Inserir referência cruzada", "picker.ph": "Busque por número ou legenda · ↑↓ para escolher · Enter para inserir · Esc para fechar",
+        "picker.empty": "Nenhum resultado", "picker.all": "Tudo",
+        "picker.allSec": "Todas as seções", "picker.secTip": "Mostrar apenas as figuras / tabelas / equações sob um título (incluindo subtítulos)",
+        "picker.secNone": "(sem título)", "picker.noAnchor": "siyuan-xref: não foi possível localizar este parágrafo, nada foi inserido. Coloque o cursor no parágrafo de destino e tente novamente",
+        "picker.noSlash": "siyuan-xref: não foi possível localizar onde /xref foi digitado, inserção cancelada. Coloque o cursor no parágrafo de destino e tente novamente",
+    },
 };
 
-/** 当前界面语言：zh | en。由 setUiLang 在 boot 时按思源语言设定 */
+/** 思源 lang → 内部代号。键统一小写、下划线换成连字符后再查（zh_CN / zh-CN 都能命中） */
+const LANG_MAP = {
+    "zh-cn": "zh", "zh-tw": "zhTW", "zh-hk": "zhTW", "zh-hant": "zhTW", "zh-cht": "zhTW",
+    zh: "zh",                                        // 任何 zh-* 兜不住的一律简体，别掉到英文
+    en: "en",
+    ja: "ja", ko: "ko",
+    de: "de", fr: "fr", es: "es", ru: "ru", "pt-br": "ptBR", pt: "ptBR",
+};
+
+/** 当前界面语言：zh | zhTW | en | ja | ko | de | fr | es | ru | ptBR。由 setUiLang 在 boot 时按思源语言设定 */
 let UI_LANG = "zh";
 
 function detectUiLang() {
     try {
         if (typeof window === "undefined") return "zh";   // 离线测试：保持中文，旧断言不受影响
-        const l = String((window.siyuan && window.siyuan.config && window.siyuan.config.lang) || "");
-        if (!l) return "zh";
-        return /^zh/i.test(l) ? "zh" : "en";
+        const raw = String((window.siyuan && window.siyuan.config && window.siyuan.config.lang) || "");
+        if (!raw) return "zh";
+        const l = raw.replace(/_/g, "-").toLowerCase();
+        if (LANG_MAP[l]) return LANG_MAP[l];
+        const base = l.split("-")[0];                    // es-ES → es，pt-PT → pt
+        if (LANG_MAP[base]) return LANG_MAP[base];
+        return "en";                                     // 其余 12 种语种退英文
     } catch (e) { return "zh"; }
 }
 
 function setUiLang(v) {
-    UI_LANG = v === "en" ? "en" : "zh";
+    UI_LANG = UI_TEXT[v] ? v : "zh";                     // 只认 UI_TEXT 里真有的块，传错不炸
     return UI_LANG;
 }
 
-/** 取界面文案，{0} {1} 依次代入参数；缺 key 时退回中文再退回 key 本身 */
+/** 取界面文案，{0} {1} 依次代入参数；缺 key 时按语言回退，最后退回 key 本身 */
 function tr(key) {
-    const dict = UI_TEXT[UI_LANG] || UI_TEXT.zh;
-    let s = dict[key];
+    let s = (UI_TEXT[UI_LANG] || UI_TEXT.zh)[key];
+    if (s === undefined) {
+        // 中文系（zh / zhTW）缺 key 退简体；其余语种退英文——别让德语用户看到中文
+        s = (UI_LANG === "zh" || UI_LANG === "zhTW") ? UI_TEXT.zh[key] : UI_TEXT.en[key];
+    }
     if (s === undefined) s = UI_TEXT.zh[key];
     if (s === undefined) s = key;
     if (arguments.length < 2) return s;
@@ -619,7 +1150,38 @@ async function retry(fn, tries = 4, delay = 600) {
     throw last;
 }
 
-const NUM_HEAD = /^\s*(图|表|Figure|Table)\s*(\d+(?:[-.]\d+)?)\s*/;
+/* ==================== 题注前缀词表（10 种界面语言） ====================
+ * 只用于「段首 + 标签 + 空格 + 数字」这种形态，所以不会碰正文里的普通句子。
+ * 长词必须排在短词前面（Figure 先于 Fig、Abbildung 先于 Abb），否则只匹配到前半截。
+ * 词表里不带末尾的点号 —— 正则统一用 \.? 兜住 Fig. / Abb. / Рис. / Табл.
+ * 用户设置里自定义的标签（figLabel 等）另走 captionLabelList，不在此表。
+ */
+const FIG_WORDS = ["Figure", "figure", "Abbildung", "abbildung", "Рисунок", "рисунок",
+    "Figura", "figura", "图", "圖", "図", "그림", "Fig", "fig", "Abb", "abb", "Рис", "рис", "Img", "img"];
+const TAB_WORDS = ["Table", "table", "Tabelle", "tabelle", "Таблица", "таблица",
+    "Tableau", "tableau", "Tabla", "tabla", "Tabela", "tabela", "表", "표",
+    "Tab", "tab", "Табл", "табл", "Tbl", "tbl"];
+const EQ_WORDS = ["Equation", "equation", "Gleichung", "gleichung", "Формула", "формула",
+    "Ecuación", "ecuación", "Equação", "equação", "式", "식",
+    "Eq", "eq", "Gl", "gl", "Éq", "Éq", "Ec", "ec", "Форм", "форм"];
+
+const FIG_SET = new Set(FIG_WORDS);
+const TAB_SET = new Set(TAB_WORDS);
+const EQ_SET = new Set(EQ_WORDS);
+
+/** 正则转义（别和 HTML 转义的 esc 混用） */
+const escRe = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** 段首编号前缀。式子不参与（公式块按 type==="m" 判，段首写「式 1」不该被当题注） */
+const NUM_HEAD = new RegExp(
+    "^\\s*(" + FIG_WORDS.concat(TAB_WORDS).map(escRe).join("|") + ")\\.?\\s*(\\d+(?:[-.]\\d+)?)\\s*");
+
+/** 前缀词 → fig / tab；不在表里返回 null */
+function prefixKind(word) {
+    if (FIG_SET.has(word)) return "fig";
+    if (TAB_SET.has(word)) return "tab";
+    return null;
+}
 
 /** 归类：custom-xref 属性优先；公式块=m→eq；段落前缀 图/表→fig/tab
  *
@@ -639,7 +1201,7 @@ function classify(b, opt) {
     if (b.type === "m") return "eq";
     if (opt && opt.textDetect === false) return null;
     const p = NUM_HEAD.exec((b.markdown || "").trim());
-    if (p) return p[1] === "图" || p[1] === "Figure" ? "fig" : "tab";
+    if (p) return prefixKind(p[1]);
     return null;
 }
 
@@ -1563,9 +2125,10 @@ function captionLabelList(s) {
         if (t && out.indexOf(t) < 0) out.push(t);
     };
     if (s) { push(s.figLabel); push(s.tabLabel); push(s.eqLabel); }
-    // 两种语言的内置标签都认：用户中途换语言、或文档是别人给的，都不能漏认
+    // 10 种界面语言的内置标签都认：用户中途换语言、或文档是别人给的，都不能漏认
     push(tr("label.fig")); push(tr("label.tab")); push(tr("label.eq"));
-    ["图", "表", "式", "Figure", "Table", "Equation", "Eq"].forEach(push);
+    // 词表里的带点写法和不带点写法都要进（块名里存的是「Abb. 2」这种完整标签）
+    [].concat(FIG_WORDS, TAB_WORDS, EQ_WORDS).forEach((w) => { push(w); push(w + "."); });
     // 长标签优先，否则「Equation 3」会先被「Eq」匹配掉一半
     return out.sort((a, b) => b.length - a.length);
 }
@@ -2598,8 +3161,9 @@ class SiYuanXref extends Plugin {
         const lab = kind === "fig" ? (this.settings.figLabel || tr("label.fig"))
             : (this.settings.tabLabel || tr("label.tab"));
         const esc = String(lab).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const alt = kind === "fig" ? "图|Figure" : "表|Table";
-        return new RegExp("^\\s*(" + esc + "|" + alt + ")\\s*\\d");
+        // 备用前缀走 10 语言词表：用户换了界面语言、或文档是别人用别的语言写的，都要认得出题注
+        const alt = (kind === "fig" ? FIG_WORDS : TAB_WORDS).map(escRe).join("|");
+        return new RegExp("^\\s*(" + esc + "|" + alt + ")\\.?\\s*\\d");
     }
 
     /**
@@ -3882,5 +4446,6 @@ SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyP
     tr: tr, setUiLang: setUiLang, detectUiLang: detectUiLang, UI_TEXT: UI_TEXT,
     eqTex: eqTex, ensureMathRenderer: ensureMathRenderer, resetMathRenderer: resetMathRenderer,
     headingText: headingText, filterPickerRows: filterPickerRows,
-    ialValue: ialValue, restoreDeadInMd: restoreDeadInMd, countRestored: countRestored };
+    ialValue: ialValue, restoreDeadInMd: restoreDeadInMd, countRestored: countRestored,
+    prefixKind: prefixKind, NUM_HEAD: NUM_HEAD, captionLabelList: captionLabelList };
 module.exports = SiYuanXref;
