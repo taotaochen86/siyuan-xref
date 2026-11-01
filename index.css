@@ -36,8 +36,54 @@
   width: calc(100% - 28px);
 }
 
+.xr-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 8px;
+  flex-wrap: wrap;
+}
+
+.xr-chips {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.xr-chip {
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  color: var(--b3-theme-on-surface, #5f6368);
+  background: var(--b3-theme-surface, #f2f3f5);
+  border: 1px solid transparent;
+}
+
+.xr-chip:hover {
+  border-color: var(--b3-border-color, #e0e0e0);
+}
+
+.xr-chip.xr-chip-on {
+  font-weight: 600;
+  color: var(--b3-theme-primary, #3573f0);
+  background: var(--b3-theme-primary-lightest, rgba(53, 115, 240, 0.12));
+  border-color: var(--b3-theme-primary-light, rgba(53, 115, 240, 0.35));
+}
+
+.xr-sec {
+  flex: 1 1 120px;
+  min-width: 0;
+  height: 26px;
+  font-size: 12px;
+}
+
 .xr-list {
   overflow-y: auto;
+  min-height: 0;   /* flex 容器里的滚动区，不给 0 会顶出面板 */
   padding-bottom: 6px;
 }
 
@@ -75,6 +121,30 @@
   padding: 16px 14px;
   font-size: 13px;
   color: var(--b3-theme-on-surface, #5f6368);
+}
+
+/* 公式行：预览里直接渲染成公式，别再显示 $$ y=1-sin(x) \tag{2-1} $$ 这种源码 */
+.xr-preview .xr-math {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.xr-preview .xr-math svg {
+  max-height: 1.6em;
+  width: auto;
+  vertical-align: middle;
+}
+
+.xr-preview .xr-math .katex {
+  font-size: 1.02em;
+}
+
+/* 渲染器还没加载好／加载失败时退回等宽源码，至少不糊成一团 */
+.xr-preview .xr-tex {
+  font-family: var(--b3-font-family-code, ui-monospace, monospace);
+  font-size: 0.92em;
 }
 
 /* 指向已删块的引用：标红 + 删除线，一眼能看出失效 */

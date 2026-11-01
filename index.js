@@ -7,11 +7,291 @@ const { Plugin, Setting, showMessage, fetchSyncPost } = require("siyuan");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* ==================== 界面语言（中 / 英，跟随思源） ====================
+ * 思源把界面语言放在 window.siyuan.config.lang（zh_CN / en_US / es_ES …）。
+ * 插件不另设开关（用户 2026-11-01 定：只跟随思源）：zh* 出中文，其余一律出英文
+ * —— 英文覆盖最广，西语/法语用户看英文也比看中文有用。
+ * 所有用户可见文案统一走 tr("key", 参数…)，{0} {1} 是占位符。
+ * 离线测试没有 window，detectUiLang 返回 zh，所以旧断言一行都不用改。
+ */
+const UI_TEXT = {
+    zh: {
+        "label.fig": "图", "label.tab": "表", "label.eq": "式",
+        "dead.text": "失效引用",
+
+        // 斜杠命令
+        "slash.xref.text": "交叉引用", "slash.xref.meta": "图 / 表 / 式",
+        "slash.num.text": "重排图表编号", "slash.num.meta": "同步刷新引用",
+        // 原生命令
+        "cmd.insert": "插入交叉引用", "cmd.renumber": "重排图表编号",
+        "cmd.undo": "撤销上次重排", "cmd.redo": "重做重排",
+
+        // 右键菜单
+        "menu.setFig": "设为图题注", "menu.setTab": "设为表题注",
+        "menu.clear": "取消图表题注",
+        "menu.add": "在{0}添加{1}题注",
+        "menu.useNext": "把{0}段落设为{1}题注",
+        "menu.ref": "插入交叉引用…",
+        "menu.where.below": "下方", "menu.where.above": "上方",
+        "menu.word.fig": "图", "menu.word.tab": "表",
+        "noun.image": "图片", "noun.table": "表格",
+        "hint.table": "图表题注：表格单元格内不支持，请右键表格本身或表格上方的题注段落",
+        "hint.mixed": "图表题注：请选中同类块（段落，或单张图/单个表）",
+        "hint.math": "图表题注：公式块会自动编号，不用设题注",
+        "hint.default": "图表题注：请右键图片/表格本身，或图下方（表上方）的题注段落",
+
+        // 设置面板
+        "set.mode.title": "编号模式",
+        "set.mode.desc": "全文连续（图 1、图 2）或按一级标题分章（图 1-1、图 2-1）",
+        "set.mode.continuous": "全文连续", "set.mode.chapter": "按章编号",
+        "set.labels.title": "图 / 表 / 式 标签",
+        "set.labels.desc": "题注前缀文字，例如填 Figure / Table / Eq",
+        "set.refs.title": "重排时同步刷新引用",
+        "set.refs.desc": "把 ((块ID \"旧锚文本\")) 全部改成新编号。关闭后只改编号不动引用",
+        "set.auto.title": "自动重排",
+        "set.auto.desc": "写完题注停手 1.5 秒后自动重排编号并刷新引用。不会写入光标所在的块，避免打断输入",
+        "set.detect.title": "文字自动识别",
+        "set.detect.desc": "正文以「图 3 ……」「表 2 ……」开头的段落自动当作题注参与编号。关掉后只认" +
+            "右键菜单设的题注（custom-xref 属性）——正文里顺口写到「图 3 中可以看出」这种普通段落" +
+            "就不会被误编号。自动识别本来就要等索引进位，慢一点没关系；右键设的题注不受此开关影响，点了立刻生效",
+        "set.dead.title": "失效引用怎么处理",
+        "set.dead.desc": "指向已删块、或指向「已取消题注」的块的引用。默认「不处理」：引用原样留着，删块后按 Ctrl+Alt+Z 能把块重建回来、" +
+            "引用自动接回；「仅标红」会在正文里涂红加删除线（看着像内容被改坏）；" +
+            "「转成文本」会让引用彻底失效、无法还原，还会等 10 秒才动手",
+        "set.dead.off": "不处理，保持原样（推荐）",
+        "set.dead.mark": "仅标红，保留引用",
+        "set.dead.text": "转成红色删除线文本（不可逆）",
+        "set.center.title": "题注居中",
+        "set.center.desc": "重排时把「图 N …」「表 N …」题注段落设为居中",
+        "set.bg.title": "题注底色",
+        "set.bg.desc": "给「图 N …」「表 N …」题注加一层很淡的底色，暗色主题下也看得清；自己设过底色的不会被改",
+        "set.bg.none": "无底色", "set.bg.faint": "极浅", "set.bg.light": "浅（默认）", "set.bg.blue": "浅蓝",
+        "set.keys.title": "自定义快捷键",
+        "set.keys.desc": "点一下输入框，再按下想用的组合键（必须带 Ctrl / Alt / ⌘）。Backspace 清空，Esc 取消。" +
+            "同时也会出现在「设置 → 快捷键 → 插件」里，两处改都行",
+        "set.keys.insert": "插入交叉引用", "set.keys.renumber": "重排编号",
+        "set.keys.undo": "撤销上次重排", "set.keys.redo": "重做",
+        "set.keys.unset": "未设置", "set.keys.press": "请按组合键…", "set.keys.tip": "点击后按下组合键",
+        "set.undo.title": "撤销步数",
+        "set.undo.desc": "插件自己记多少轮重排可以撤回（1~50）。思源的 Ctrl+Z 撤不到插件写入，所以单独记一份",
+        "set.restore.title": "还原失效引用",
+        "set.restore.desc": "把以前被「转成文本」烧掉的引用改回 ((块ID \"锚\"))。目标块已删除的会自动跳过",
+        "set.restore.btn": "还原当前文档", "set.restore.busy": "还原中…",
+        "set.debug.title": "诊断日志（排查用）",
+        "set.debug.desc": "开启后会拦截全局网络请求并写 ws-log.json / err-log.json。" +
+            "**只在排查问题时开，平时请关闭**，会拖慢思源",
+
+        // 提示消息
+        "msg.loadErr": "siyuan-xref 加载异常：{0}（详见 data/storage/petal/siyuan-xref/err-log.json）",
+        "msg.error": "siyuan-xref 出错：{0}",
+        "msg.noDoc": "siyuan-xref：未取到当前文档",
+        "msg.busy": "siyuan-xref：重排一直没结束，本次操作未执行，请稍后重试",
+        "msg.renumbering": "siyuan-xref：正在重排，请稍候再试",
+        "msg.setDone": "已设为{0}题注{1}",
+        "msg.nBlocks": " {0} 处",
+        "msg.attrWritten": "siyuan-xref：属性已写入，编号稍后自动补上（{0} 处）",
+        "msg.addFail": "siyuan-xref：没能在图/表旁边插入题注段落，请重试",
+        "msg.addPending": "siyuan-xref：题注段落已插入，编号稍后自动补上",
+        "msg.addDone": "已在{0}添加{1}题注{2}，可直接补写说明",
+        "msg.notIndexed": "siyuan-xref：这块还没进索引，请稍后重试",
+        "msg.wrongSide": "siyuan-xref：题注不在{0}{1}，而在另一侧。请直接右键那个题注段落，选「取消图表题注」",
+        "msg.noNeighbor": "siyuan-xref：没找到该{0}{1}紧邻的题注段落，请右键题注段落本身取消",
+        "msg.cancelled": "已取消题注{0}{1}",
+        "msg.cancelWrap": "（{0}）",
+        "msg.cancel.none": "本来就没有编号前缀",
+        "msg.cancel.names": "已清除块命名 {0} 处",
+        "msg.cancel.stuck": "{0} 处的编号前缀没能去除，请手动删掉那行前缀后重试",
+        "msg.cancel.orphan": "另有 {0} 处引用仍写着原编号",
+        "msg.sep": "，",
+        "msg.settingsSaved": "siyuan-xref：设置已保存",
+        "msg.noTargets": "siyuan-xref：本文档没识别到图/表/公式",
+        "msg.emptyEq": "siyuan-xref：有 {0} 个公式块内容为空（只剩 \\tag），请检查公式是否丢失",
+        "msg.renumbered": "siyuan-xref：已重排 {0} 项，刷新引用 {1} 处",
+        "msg.burned": "，另把 {0} 处失效引用转成了红色删除线文本",
+        "msg.deadGrace": "，发现 {0} 处失效引用（{1} 秒后仍未恢复才转文本）",
+        "msg.deadFound": "，发现 {0} 处失效引用",
+        "msg.deadPainted": "siyuan-xref：{0} 处交叉引用已失效（指向已删的块，或该块已取消题注），已在正文里标红",
+        "msg.noUndo": "siyuan-xref：没有可撤销的重排记录",
+        "msg.undoDone": "siyuan-xref：已撤销 {0} 那轮重排（{1} 处{2}{3}），还剩 {4} 步可撤",
+        "msg.undoRebuilt": "，重建了 {0} 个已被删除的块",
+        "msg.undoMiss": "，{0} 处块已不存在",
+        "msg.noRedo": "siyuan-xref：没有可重做的重排记录",
+        "msg.redoDone": "siyuan-xref：已重做，撤销栈 {0} 步{1}",
+        "msg.redoRebuilt": "（重建 {0} 块）",
+        "msg.noArchive": "siyuan-xref：没有可还原的记录（dead-fix-log.json 为空）",
+        "msg.noDocDead": "siyuan-xref：当前文档没有失效引用记录",
+        "msg.restored": "siyuan-xref：还原 {0} 处引用（{1} 个块）{2}",
+        "msg.restoreMiss": "；{0} 个块找不到或目标块已删",
+        "msg.readFail": "siyuan-xref 读取失败：{0}",
+        "msg.insertFail": "插入失败：{0}",
+
+        // 交叉引用选择面板
+        "picker.title": "插入交叉引用",
+        "picker.ph": "搜索编号或题注，↑↓ 选择，回车插入，Esc 关闭",
+        "picker.empty": "没有匹配项",
+        "picker.all": "全部",
+        "picker.allSec": "全部章节",
+        "picker.secTip": "只看某个标题下的图 / 表 / 式（含它的子标题）",
+        "picker.secNone": "（无标题）",
+        "picker.noAnchor": "siyuan-xref：定位不到这个段落，引用未插入。请把光标放到目标段落再试",
+        "picker.noSlash": "siyuan-xref：定位不到 /xref 所在位置，已取消插入。请把光标放到目标段落再试",
+    },
+    en: {
+        "label.fig": "Figure", "label.tab": "Table", "label.eq": "Eq",
+        "dead.text": "broken reference",
+
+        "slash.xref.text": "Cross-reference", "slash.xref.meta": "figure / table / equation",
+        "slash.num.text": "Renumber captions", "slash.num.meta": "refresh references too",
+        "cmd.insert": "Insert cross-reference", "cmd.renumber": "Renumber captions",
+        "cmd.undo": "Undo last renumber", "cmd.redo": "Redo renumber",
+
+        "menu.setFig": "Set as figure caption", "menu.setTab": "Set as table caption",
+        "menu.clear": "Clear caption",
+        "menu.add": "Add a {1} caption {0}",
+        "menu.useNext": "Use the paragraph {0} as the {1} caption",
+        "menu.ref": "Insert cross-reference…",
+        "menu.where.below": "below", "menu.where.above": "above",
+        "menu.word.fig": "figure", "menu.word.tab": "table",
+        "noun.image": "image", "noun.table": "table",
+        "hint.table": "Captions: not available inside a table cell — right-click the table itself or the caption above it",
+        "hint.mixed": "Captions: select blocks of the same kind (paragraphs, or a single image / table)",
+        "hint.math": "Captions: equation blocks are numbered automatically, no caption needed",
+        "hint.default": "Captions: right-click the image / table itself, or the caption paragraph below a figure (above a table)",
+
+        "set.mode.title": "Numbering mode",
+        "set.mode.desc": "Continuous through the whole document (Figure 1, Figure 2) or restart at every top-level heading (Figure 1-1, Figure 2-1)",
+        "set.mode.continuous": "Continuous", "set.mode.chapter": "Per chapter",
+        "set.labels.title": "Figure / table / equation labels",
+        "set.labels.desc": "Text written in front of each number, e.g. Figure / Table / Eq",
+        "set.refs.title": "Refresh references when renumbering",
+        "set.refs.desc": "Rewrites every ((block id \"old anchor\")) to the new number. Turn it off to change numbers only and leave references alone.",
+        "set.auto.title": "Auto renumber",
+        "set.auto.desc": "Renumbers and refreshes references 1.5 s after you stop typing. It never writes into the block holding the caret, so typing is not interrupted.",
+        "set.detect.title": "Detect captions from text",
+        "set.detect.desc": "A paragraph that starts with 图 3 / Figure 3 / 表 2 / Table 2 counts as a caption. " +
+            "Turn it off to accept only captions set from the right-click menu (the custom-xref attribute), so an ordinary " +
+            "sentence such as \"as Figure 3 shows\" is never renumbered. Detection has to wait for the index to catch up, which is fine; " +
+            "captions set from the menu are not affected and take effect immediately.",
+        "set.dead.title": "Broken references",
+        "set.dead.desc": "A reference pointing to a deleted block, or to a block whose caption was cleared. Default \"leave alone\": the reference " +
+            "stays as it is, and Ctrl+Alt+Z rebuilds the deleted block with its original ID so the reference reconnects. \"Mark red\" paints it red " +
+            "with a strikethrough, which is easy to mistake for content damage. \"Convert to text\" is irreversible and waits 10 s before acting.",
+        "set.dead.off": "Leave alone (recommended)",
+        "set.dead.mark": "Mark red, keep the reference",
+        "set.dead.text": "Convert to red strikethrough text (irreversible)",
+        "set.center.title": "Centre captions",
+        "set.center.desc": "Centres every figure / table caption paragraph while renumbering",
+        "set.bg.title": "Caption tint",
+        "set.bg.desc": "Adds a very light tint behind caption paragraphs; still readable in dark themes. Captions you tinted yourself are left alone.",
+        "set.bg.none": "None", "set.bg.faint": "Very faint", "set.bg.light": "Light (default)", "set.bg.blue": "Pale blue",
+        "set.keys.title": "Custom hotkeys",
+        "set.keys.desc": "Click a field, then press the combination you want (Ctrl / Alt / ⌘ required). Backspace clears it, Esc cancels. " +
+            "The same keys also appear under Settings → Keymap → Plugins; either place works.",
+        "set.keys.insert": "Insert reference", "set.keys.renumber": "Renumber",
+        "set.keys.undo": "Undo renumber", "set.keys.redo": "Redo",
+        "set.keys.unset": "not set", "set.keys.press": "press keys…", "set.keys.tip": "Click, then press the keys",
+        "set.undo.title": "Undo depth",
+        "set.undo.desc": "How many renumber runs stay undoable (1–50). SiYuan's own Ctrl+Z cannot undo API writes, so the plugin keeps its own stack.",
+        "set.restore.title": "Restore broken references",
+        "set.restore.desc": "Turns references that were previously burned into plain text back into ((block id \"anchor\")). Blocks whose target no longer exists are skipped.",
+        "set.restore.btn": "Restore this document", "set.restore.busy": "Restoring…",
+        "set.debug.title": "Diagnostic log (troubleshooting)",
+        "set.debug.desc": "Intercepts every network request and writes ws-log.json / err-log.json. " +
+            "Turn it on only while troubleshooting — it slows SiYuan down.",
+
+        "msg.loadErr": "siyuan-xref failed to load: {0} (see data/storage/petal/siyuan-xref/err-log.json)",
+        "msg.error": "siyuan-xref error: {0}",
+        "msg.noDoc": "siyuan-xref: no current document",
+        "msg.busy": "siyuan-xref: renumbering never finished, nothing was done — please try again",
+        "msg.renumbering": "siyuan-xref: renumbering in progress, please wait",
+        "msg.setDone": "Set as {0} caption{1}",
+        "msg.nBlocks": " ({0} blocks)",
+        "msg.attrWritten": "siyuan-xref: attribute saved, numbers will follow shortly ({0})",
+        "msg.addFail": "siyuan-xref: could not insert a caption paragraph next to the figure / table, please retry",
+        "msg.addPending": "siyuan-xref: caption paragraph inserted, numbers will follow shortly",
+        "msg.addDone": "Added a {1} caption {0}{2} — you can type the description now",
+        "msg.notIndexed": "siyuan-xref: this block is not indexed yet, please retry",
+        "msg.wrongSide": "siyuan-xref: the caption sits on the other side, not {1} the {0}. Right-click that caption paragraph and choose \"Clear caption\"",
+        "msg.noNeighbor": "siyuan-xref: no caption paragraph directly {1} this {0}. Right-click the caption paragraph itself to clear it",
+        "msg.cancelled": "Caption cleared{0}{1}",
+        "msg.cancelWrap": " ({0})",
+        "msg.cancel.none": "there was no leading number",
+        "msg.cancel.names": "{0} block name(s) cleared",
+        "msg.cancel.stuck": "{0} leading number(s) could not be removed — delete that prefix by hand and retry",
+        "msg.cancel.orphan": "{0} reference(s) still show the old number",
+        "msg.sep": ", ",
+        "msg.settingsSaved": "siyuan-xref: settings saved",
+        "msg.noTargets": "siyuan-xref: no figures, tables or equations found in this document",
+        "msg.emptyEq": "siyuan-xref: {0} equation block(s) are empty (only \\tag left) — check whether the formula was lost",
+        "msg.renumbered": "siyuan-xref: {0} caption(s) renumbered, {1} reference(s) refreshed",
+        "msg.burned": ", {0} broken reference(s) converted to red strikethrough text",
+        "msg.deadGrace": ", {0} broken reference(s) found (converted to text only after {1}s)",
+        "msg.deadFound": ", {0} broken reference(s) found",
+        "msg.deadPainted": "siyuan-xref: {0} cross-reference(s) are broken (target deleted, or its caption was cleared) and are marked red in the document",
+        "msg.noUndo": "siyuan-xref: nothing to undo",
+        "msg.undoDone": "siyuan-xref: undid the {0} renumber run ({1} change(s){2}{3}), {4} step(s) left",
+        "msg.undoRebuilt": ", rebuilt {0} deleted block(s)",
+        "msg.undoMiss": ", {0} block(s) no longer exist",
+        "msg.noRedo": "siyuan-xref: nothing to redo",
+        "msg.redoDone": "siyuan-xref: redone, undo stack {0} step(s){1}",
+        "msg.redoRebuilt": " (rebuilt {0} block(s))",
+        "msg.noArchive": "siyuan-xref: nothing to restore (dead-fix-log.json is empty)",
+        "msg.noDocDead": "siyuan-xref: no broken references recorded for this document",
+        "msg.restored": "siyuan-xref: restored {0} reference(s) in {1} block(s){2}",
+        "msg.restoreMiss": "; {0} block(s) missing or target already deleted",
+        "msg.readFail": "siyuan-xref read failed: {0}",
+        "msg.insertFail": "Insert failed: {0}",
+
+        "picker.title": "Insert cross-reference",
+        "picker.ph": "Search by number or caption · ↑↓ to choose · Enter to insert · Esc to close",
+        "picker.empty": "No matches",
+        "picker.all": "All",
+        "picker.allSec": "All sections",
+        "picker.secTip": "Show only the figures / tables / equations under one heading (sub-headings included)",
+        "picker.secNone": "(no heading)",
+        "picker.noAnchor": "siyuan-xref: cannot locate this paragraph, nothing was inserted. Put the caret in the target paragraph and retry",
+        "picker.noSlash": "siyuan-xref: cannot locate where /xref was typed, insertion cancelled. Put the caret in the target paragraph and retry",
+    },
+};
+
+/** 当前界面语言：zh | en。由 setUiLang 在 boot 时按思源语言设定 */
+let UI_LANG = "zh";
+
+function detectUiLang() {
+    try {
+        if (typeof window === "undefined") return "zh";   // 离线测试：保持中文，旧断言不受影响
+        const l = String((window.siyuan && window.siyuan.config && window.siyuan.config.lang) || "");
+        if (!l) return "zh";
+        return /^zh/i.test(l) ? "zh" : "en";
+    } catch (e) { return "zh"; }
+}
+
+function setUiLang(v) {
+    UI_LANG = v === "en" ? "en" : "zh";
+    return UI_LANG;
+}
+
+/** 取界面文案，{0} {1} 依次代入参数；缺 key 时退回中文再退回 key 本身 */
+function tr(key) {
+    const dict = UI_TEXT[UI_LANG] || UI_TEXT.zh;
+    let s = dict[key];
+    if (s === undefined) s = UI_TEXT.zh[key];
+    if (s === undefined) s = key;
+    if (arguments.length < 2) return s;
+    const args = Array.prototype.slice.call(arguments, 1);
+    return String(s).replace(/\{(\d)\}/g, (m, i) => {
+        const v = args[Number(i)];
+        return v === undefined || v === null ? "" : String(v);
+    });
+}
+
 const DEFAULTS = {
     mode: "continuous", // continuous 全文连续 | chapter 按 h1 分章（图 1-1）
-    figLabel: "图",
-    tabLabel: "表",
-    eqLabel: "式",
+    // 标签留空 = 跟界面语言（中文出「图/表/式」，英文出 Figure/Table/Eq）。
+    // 老用户 settings.json 里已经有值，boot 时只填空的那几个，不动他们改过的
+    figLabel: "",
+    tabLabel: "",
+    eqLabel: "",
     refreshRefs: true,
     autoMode: true,     // 写完停手 autoDelay 毫秒后自动重排
     autoDelay: 1500,
@@ -94,7 +374,7 @@ function captionBgOf(s) {
  * 删除线和红色都在一个元素上（实测 insertBlock 归一化结果）。
  */
 function deadText(old) {
-    let t = String(old || "").trim() || "失效引用";
+    let t = String(old || "").trim() || tr("dead.text");
     t = t.replace(/[<>{}~]/g, ""); // 防内联语法被撑破
     return '~~<span data-type="text" style="color:var(--b3-font-color1)">' + t + "</span>~~";
 }
@@ -565,6 +845,9 @@ function domBlockMeta(el) {
 /**
  * 图/表紧邻的那一块（只认普通段落，且不在表格里）。
  * 方向按学术排版惯例：**图题在下、表题在上** —— 所以图看下一个兄弟，表看上一个。
+ * **只看这一个方向**，反向一律不认（2026-11-01 用户明确选的 B：
+ * 题注放错了边，就让人去右键那个题注本身，不要插件替他猜）。
+ * 最多看两格：中间夹一个空段落是常见排版（手动空行），跳过它继续找同方向的题注。
  * 返回 null = 那一侧没有可用段落；undefined = 拿不到 DOM（调用方就别提前判断）。
  */
 function neighborPara(el, kind) {
@@ -572,11 +855,22 @@ function neighborPara(el, kind) {
         if (!el || !el.getAttribute) return undefined;
         const key = kind === "tab" ? "previousElementSibling" : "nextElementSibling";
         if (!(key in el)) return undefined;
-        const nx = el[key];
-        if (!nx || !nx.getAttribute) return null;
-        const m = domBlockMeta(nx);
-        if (!m || m.img || m.type !== "p" || m.tbl) return null;
-        return { id: m.id, kind: nx.getAttribute("custom-xref") || "", text: nx.textContent || "" };
+        let nx = el[key];
+        for (let n = 1; n <= 2; n++) {
+            if (!nx || !nx.getAttribute) return null;
+            const m = domBlockMeta(nx);
+            if (!m || m.img || m.type !== "p" || m.tbl) return null;
+            const cap = { id: m.id, kind: nx.getAttribute("custom-xref") || "", text: nx.textContent || "" };
+            const capLike = cap.kind === "fig" || cap.kind === "tab" ||
+                NUM_HEAD.test(String(cap.text || "").trim());
+            if (capLike) return cap;
+            // 第一格是普通段落：有正文就交给菜单判断（「把这一块设为题注」）；
+            // 空段落没内容可当题注，跳过去看第二格（那里只认已经是题注的块）
+            if (n === 1 && String(cap.text || "").trim()) return cap;
+            if (n === 2) return null;
+            nx = nx[key];
+        }
+        return null;
     } catch (e) { return undefined; }
 }
 
@@ -606,10 +900,10 @@ function mediaCaptionMenu(media) {
     if (bad) return { ok: false, mode: "none", reason: "type:" + (bad.type || "?"), items: [] };
     if (kinds.some((k) => k !== kinds[0])) return { ok: false, mode: "none", reason: "mixed", items: [] };
     const kind = kinds[0];
-    const word = kind === "fig" ? "图" : "表";
-    const where = kind === "fig" ? "下方" : "上方";
+    const word = kind === "fig" ? tr("menu.word.fig") : tr("menu.word.tab");
+    const where = kind === "fig" ? tr("menu.where.below") : tr("menu.where.above");
     const icon = kind === "fig" ? "iconImage" : "iconTable";
-    const items = [{ key: "add", label: "在" + where + "添加" + word + "题注", icon: icon, kind: kind, add: true }];
+    const items = [{ key: "add", label: tr("menu.add", where, word), icon: icon, kind: kind, add: true }];
     if (media.length === 1) {
         const hasNext = "next" in media[0];
         const nb = hasNext ? media[0].next : undefined;
@@ -619,16 +913,16 @@ function mediaCaptionMenu(media) {
             if (capLike) {
                 // 已经是同类型题注（或老数据只有「图 3」前缀没属性）才给「取消」
                 if (!nbKind || nbKind === kind) {
-                    items.push({ key: "clear", label: "取消图表题注", icon: "iconTrashcan",
+                    items.push({ key: "clear", label: tr("menu.clear"), icon: "iconTrashcan",
                         cancel: true, kind: kind, targets: [nb.id] });
                 }
             } else if (String(nb.text || "").trim()) {
-                items.push({ key: "use-next", label: "把" + where + "段落设为" + word + "题注", icon: icon,
+                items.push({ key: "use-next", label: tr("menu.useNext", where, word), icon: icon,
                     kind: kind, targets: [nb.id] });
             }
         } else if (!hasNext) {
             // 拿不到 DOM，判断不了那一侧有没有题注 —— 保守留着「取消」，点下去现场再找
-            items.push({ key: "clear", label: "取消图表题注", icon: "iconTrashcan", cancel: true, kind: kind });
+            items.push({ key: "clear", label: tr("menu.clear"), icon: "iconTrashcan", cancel: true, kind: kind });
         }
     }
     return { ok: true, mode: "media", reason: "", kind: kind, items: items };
@@ -660,19 +954,22 @@ function captionMenu(els, look) {
     const isCap = info.some((i) => i.kind === "fig" || i.kind === "tab" ||
         NUM_HEAD.test(String(i.text || "")));
     const items = [
-        { key: "fig", label: "设为图题注", icon: "iconImage", kind: "fig" },
-        { key: "tab", label: "设为表题注", icon: "iconTable", kind: "tab" },
+        { key: "fig", label: tr("menu.setFig"), icon: "iconImage", kind: "fig" },
+        { key: "tab", label: tr("menu.setTab"), icon: "iconTable", kind: "tab" },
     ];
-    if (isCap) items.push({ key: "clear", label: "取消图表题注", icon: "iconTrashcan", cancel: true });
+    if (isCap) items.push({ key: "clear", label: tr("menu.clear"), icon: "iconTrashcan", cancel: true,
+        targets: list.map((e) => e.id) });
+    // 「插入交叉引用…」不在这里给：它由 onBlockIcon 统一追加，只在**正文文字**上出现
+    // （块标菜单不给、图片/表格本身也不给 —— 2026-11-01 用户定的）。
     return { ok: true, mode: "para", reason: "", items: items };
 }
 
 /** 不能用题注时的灰字说明（按原因给不同提示，别让人以为是插件坏了） */
 function menuHint(reason) {
-    if (reason === "table") return "图表题注：表格单元格内不支持，请右键表格本身或表格上方的题注段落";
-    if (reason === "mixed") return "图表题注：请选中同类块（段落，或单张图/单个表）";
-    if (reason === "type:m") return "图表题注：公式块会自动编号，不用设题注";
-    return "图表题注：请右键图片/表格本身，或图下方（表上方）的题注段落";
+    if (reason === "table") return tr("hint.table");
+    if (reason === "mixed") return tr("hint.mixed");
+    if (reason === "type:m") return tr("hint.math");
+    return tr("hint.default");
 }
 
 /**
@@ -836,6 +1133,35 @@ async function collectFresh(docId, protyle) {
     return { blocks: blocks, stale: stale };
 }
 
+/** 标题块的纯文字（去掉 `##` 前缀和行尾 IAL），面板的章节下拉要显示它 */
+function headingText(md) {
+    return String(md || "")
+        .replace(/^\s*#{1,6}\s*/, "")
+        .replace(/\s*\{:[^}]*\}\s*$/, "")
+        .replace(/\s*\n\s*/g, " ")
+        .trim()
+        .slice(0, 60);
+}
+
+/**
+ * 交叉引用面板的筛选：类型（kind）+ 所属标题（secId，含子标题）+ 搜索词（q）。
+ * 抽成纯函数是为了能离线测 —— 面板本体要 DOM 和内核，测不动。
+ * secId 命中判定看 hPath（"根/…/当前" 的标题块 id 链），所以选一个 h1 会带出它所有子节的图表。
+ */
+function filterPickerRows(rows, opt) {
+    const o = opt || {};
+    const kind = o.kind || "";
+    const sec = o.secId || "";
+    const q = String(o.q || "").trim().toLowerCase();
+    return (rows || []).filter((x) => {
+        if (!x) return false;
+        if (kind && x.kind !== kind) return false;
+        if (sec && ("/" + (x.hPath || "") + "/").indexOf("/" + sec + "/") < 0) return false;
+        if (q && (x.name + " " + x.oldMd).toLowerCase().indexOf(q) < 0) return false;
+        return true;
+    });
+}
+
 /** 生成编号计划 + 需要刷新的引用 */
 /** 取文档里最浅的标题级别作为分章依据（h1 优先，没有 h1 就用 h2，以此类推） */
 function pickChapterLevel(blocks) {
@@ -849,18 +1175,42 @@ function pickChapterLevel(blocks) {
     return lv === 9 ? 0 : lv;
 }
 
-function buildPlan(blocks, s, deadSet) {
+function buildPlan(blocks, s, deadSet, exclSet) {
     const dead = deadSet instanceof Set ? deadSet : new Set();
+    // 点名排除：这些块本轮**绝不写前缀、不占编号**（取消题注刚剥完前缀的那一刻用）。
+    // 不走 classify —— 那一条还得看 blocks 表里的旧文字/旧属性，索引没跟上就会把它
+    // 重新认成题注、把编号又写回去，用户看到的现象就是「取消题注点了没反应」。
+    const excl = exclSet instanceof Set ? exclSet : new Set();
     const act = s.deadRefAction || "off";
     const fixDead = act === "text" && dead.size > 0;
     const counters = { fig: 0, tab: 0, eq: 0 };
-    const labelOf = { fig: s.figLabel, tab: s.tabLabel, eq: s.eqLabel };
+    // 标签留空 = 跟界面语言走（中文「图」、英文「Figure」）
+    const labelOf = { fig: s.figLabel || tr("label.fig"), tab: s.tabLabel || tr("label.tab"),
+        eq: s.eqLabel || tr("label.eq") };
     const chapLv = s.mode === "chapter" ? pickChapterLevel(blocks) : 0;
     let chapter = 1;
     let seenH1 = false;
     const plan = [];
+    // 当前所在的标题链（越靠后越深）。面板要按「这一节」筛选，靠它给每项标注归属。
+    const hStack = [];
+    const sections = [];   // 文档大纲（按出现顺序），面板的章节下拉用它
+    const secSeen = new Set();
     for (const b of blocks) {
-        if (chapLv && b.subtype === "h" + chapLv) {
+        // 标题块：先把「现在写到哪一节了」记下来 —— 章节切换的判断也要靠这一步，
+        // 所以放在 continue 之前，否则每章的标题会漏出栈
+        let chapBreak = false;
+        if (b.type === "h" && b.subtype) {
+            const lv = parseInt(String(b.subtype).slice(1), 10) || 1;
+            while (hStack.length && hStack[hStack.length - 1].lv >= lv) hStack.pop();
+            const txt = headingText(b.markdown);
+            hStack.push({ id: b.id, lv: lv, text: txt });
+            if (chapLv && b.subtype === "h" + chapLv) chapBreak = true;
+            if (!secSeen.has(b.id)) {
+                secSeen.add(b.id);
+                sections.push({ id: b.id, lv: lv, text: txt, path: hStack.map((x) => x.id).join("/") });
+            }
+        }
+        if (chapBreak) {
             if (seenH1) {
                 chapter += 1;
                 counters.fig = counters.tab = counters.eq = 0;
@@ -868,6 +1218,7 @@ function buildPlan(blocks, s, deadSet) {
             seenH1 = true;
             continue;
         }
+        if (excl.has(b.id)) continue;      // 本轮点名不编号（取消题注的块）
         const kind = classify(b, s);
         if (!kind) continue;
         counters[kind] += 1;
@@ -884,11 +1235,17 @@ function buildPlan(blocks, s, deadSet) {
         } else if (b.type !== "t") {
             newMd = name + " " + body;
         }
+        const top = hStack.length ? hStack[hStack.length - 1] : null;
         plan.push({ id: b.id, type: b.type, kind: kind, seq: seq, name: name, newMd: newMd,
             emptyEq: emptyEq,
             oldMd: (b.markdown || "").slice(0, 60),
             curMd: b.markdown || "",   // 未截断的原内容，用来判断「真的需要重写吗」
             ial: b.ial || "",
+            // 归属章节：面板按标题筛选要用。hPath 是「根→当前」的块 id 链（"a/b/c"），
+            // 选某个标题时用它判断「这一项是不是在那一节里（含子节）」
+            hPath: hStack.map((x) => x.id).join("/"),
+            hLv: top ? top.lv : 0,
+            hText: top ? top.text : "",
             // 图/表题注默认居中 + 浅底色（公式块本身居中，不用设）
             center: s.centerCaption !== false && (kind === "fig" || kind === "tab"),
             bg: (kind === "fig" || kind === "tab") ? captionBgOf(s) : "" });
@@ -926,7 +1283,7 @@ function buildPlan(blocks, s, deadSet) {
             }
         }
     }
-    return { plan: plan, refs: refs, deadRefs: deadRefs };
+    return { plan: plan, refs: refs, deadRefs: deadRefs, sections: sections };
 }
 
 /**
@@ -1206,6 +1563,8 @@ function captionLabelList(s) {
         if (t && out.indexOf(t) < 0) out.push(t);
     };
     if (s) { push(s.figLabel); push(s.tabLabel); push(s.eqLabel); }
+    // 两种语言的内置标签都认：用户中途换语言、或文档是别人给的，都不能漏认
+    push(tr("label.fig")); push(tr("label.tab")); push(tr("label.eq"));
     ["图", "表", "式", "Figure", "Table", "Equation", "Eq"].forEach(push);
     // 长标签优先，否则「Equation 3」会先被「Eq」匹配掉一半
     return out.sort((a, b) => b.length - a.length);
@@ -1389,9 +1748,99 @@ function restoreCaret(blockId) {
     return false;
 }
 
+/**
+ * 把光标放到指定块的**末尾**，不认斜杠残留。
+ * 右键菜单专用：右击某个段落 → 插入交叉引用，条就该出现在这一段最后，
+ * 而不是跑到别的块里（右键会移动选区，不能指望原来的光标位置还在）。
+ */
+function caretToBlockEnd(blockId) {
+    if (typeof document === "undefined") return false;
+    const el = blockId
+        ? document.querySelector('.protyle-wysiwyg [data-node-id="' + blockId + '"]')
+        : null;
+    if (!el) return false;
+    const sel = window.getSelection();
+    if (!sel) return false;
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    return true;
+}
+
 function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+
+/* ---------- 公式预览：把 $$ … \tag{2-1} $$ 渲染成真公式 ---------- */
+
+/**
+ * 从公式块 markdown 里取纯 LaTeX：去掉 $$ 包裹和 \tag{n}。
+ * 编号已经在列表左侧的名字（「式 2-1」）里了，预览里再显示一遍 \tag 只是噪音。
+ */
+function eqTex(md) {
+    let s = String(md || "").trim();
+    s = s.replace(/^\$\$/, "").replace(/\$\$$/, "");
+    s = s.replace(/\\{1,2}tag\s*\{[^}]*\}/g, "");
+    return s.replace(/\s+/g, " ").trim();
+}
+
+let XR_MATH = null;   // (tex) => html，失败返回 ""。null = 还没试过
+
+/** 只给离线测试用：忘掉缓存过的渲染器，重新探测（运行时不调用） */
+function resetMathRenderer() { XR_MATH = null; }
+
+/**
+ * 取一个「LaTeX → HTML」渲染器，优先用页面里现成的：
+ *   ① MathJax（思源默认引擎，输出自包含 SVG，不依赖任何 CSS）
+ *   ② KaTeX（思源的数学引擎若是 KaTeX，脚本已在页面里）
+ *   ③ 都没有 → 按需加载思源**自带**的 katex.min.js / katex.min.css
+ *      （/stage/protyle/js/katex/，本地文件毫秒级，插件不必自己打包 280KB）
+ * 全失败返回 null，调用方退回等宽源码。绝不抛异常 —— 渲染不出来也不能影响插入引用。
+ */
+async function ensureMathRenderer() {
+    if (XR_MATH) return XR_MATH;
+    const w = typeof window === "undefined" ? null : window;
+    if (!w || typeof document === "undefined") return null;
+    const useMj = () => {
+        const mj = w.MathJax;
+        if (!mj || typeof mj.tex2svg !== "function") return null;
+        XR_MATH = (tex) => { try { return (mj.tex2svg(tex, { display: false }) || {}).outerHTML || ""; } catch (e) { return ""; } };
+        return XR_MATH;
+    };
+    const useKatex = () => {
+        const k = w.katex;
+        if (!k || typeof k.renderToString !== "function") return null;
+        XR_MATH = (tex) => { try { return k.renderToString(tex, { throwOnError: false, displayMode: false }); } catch (e) { return ""; } };
+        return XR_MATH;
+    };
+    if (useMj() || useKatex()) return XR_MATH;
+    try {
+        if (!document.querySelector('script[data-xref-katex]')) {
+            const base = "/stage/protyle/js/katex/";
+            if (!document.querySelector('link[data-xref-katex]')) {
+                const link = document.createElement("link");
+                link.rel = "stylesheet";
+                link.href = base + "katex.min.css";
+                link.setAttribute("data-xref-katex", "1");
+                document.head.appendChild(link);
+            }
+            const sc = document.createElement("script");
+            sc.src = base + "katex.min.js";
+            sc.setAttribute("data-xref-katex", "1");
+            document.head.appendChild(sc);
+        }
+        // 最多等 1.2 秒：思源自带的 katex.min.js 是本地文件，正常几十毫秒就好了；
+        // 真加载不到就当没有，面板照常弹出来（只是显示源码），别让人干等
+        for (let i = 0; i < 24; i++) {
+            if (useKatex()) return XR_MATH;
+            await sleep(50);
+        }
+    } catch (e) { /* 走下面的 null */ }
+    return null;
+}
+
 
 /** 给指向已删块的引用 span 加红：只在当前打开文档可见，导出靠锚文本里的〔已删除〕 */
 function paintDead(ids) {
@@ -1415,32 +1864,33 @@ class SiYuanXref extends Plugin {
         } catch (e) {
             await logErr("onload", e);
             try { console.error("[siyuan-xref] 加载失败", e); } catch (err) {}
-            showMessage("siyuan-xref 加载异常：" + (e && e.message ? e.message : e) +
-                "（详见 data/storage/petal/siyuan-xref/err-log.json）", 9000, "error");
+            showMessage(tr("msg.loadErr", (e && e.message ? e.message : e)), 9000, "error");
         }
     }
 
     async boot() {
+        // 界面语言最先定：后面所有菜单/提示都靠它（用户 2026-11-01 定：只跟随思源，不做手动开关）
+        setUiLang(detectUiLang());
         // 先同步注册斜杠命令：onload 内后续有 await，避免打开文档时读不到
         this.protyleSlash = [
             {
                 id: "xref-ref",
-                filter: ["xref", "交叉引用", "图ref", "tref"],
-                html: '<div class="b3-list-item__first"><span class="b3-list-item__text">交叉引用</span>' +
-                    '<span class="b3-list-item__meta">图 / 表 / 式</span></div>',
+                filter: ["xref", "交叉引用", "图ref", "tref", "reference", "cite"],
+                html: '<div class="b3-list-item__first"><span class="b3-list-item__text">' + esc(tr("slash.xref.text")) + "</span>" +
+                    '<span class="b3-list-item__meta">' + esc(tr("slash.xref.meta")) + "</span></div>",
                 showInLite: true,
                 callback: (protyle, nodeEl) => {
                     this.openPicker(protyle, nodeEl).catch((e) => {
                         logErr("slash:xref", e);
-                        showMessage("siyuan-xref 出错：" + (e && e.message ? e.message : e), 8000, "error");
+                        showMessage(tr("msg.error", (e && e.message ? e.message : e)), 8000, "error");
                     });
                 },
             },
             {
                 id: "xref-num",
-                filter: ["xrefnum", "重排编号", "图表编号"],
-                html: '<div class="b3-list-item__first"><span class="b3-list-item__text">重排图表编号</span>' +
-                    '<span class="b3-list-item__meta">同步刷新引用</span></div>',
+                filter: ["xrefnum", "重排编号", "图表编号", "renumber"],
+                html: '<div class="b3-list-item__first"><span class="b3-list-item__text">' + esc(tr("slash.num.text")) + "</span>" +
+                    '<span class="b3-list-item__meta">' + esc(tr("slash.num.meta")) + "</span></div>",
                 showInLite: true,
                 callback: (protyle) => {
                     this.renumber(protyle).catch((e) => { logErr("slash:xrefnum", e); });
@@ -1452,25 +1902,25 @@ class SiYuanXref extends Plugin {
         try {
             this.addCommand({
                 langKey: "xrefInsert",
-                langText: "插入交叉引用",
+                langText: tr("cmd.insert"),
                 hotkey: "",
                 editorCallback: (protyle) => { this.fire("insert", protyle, null); },
             });
             this.addCommand({
                 langKey: "xrefRenumber",
-                langText: "重排图表编号",
+                langText: tr("cmd.renumber"),
                 hotkey: "",
                 editorCallback: (protyle) => { this.fire("num", protyle, null); },
             });
             this.addCommand({
                 langKey: "xrefUndo",
-                langText: "撤销上次重排",
+                langText: tr("cmd.undo"),
                 hotkey: "",
                 editorCallback: () => { this.fire("undo", null, null); },
             });
             this.addCommand({
                 langKey: "xrefRedo",
-                langText: "重做重排",
+                langText: tr("cmd.redo"),
                 hotkey: "",
                 editorCallback: () => { this.fire("redo", null, null); },
             });
@@ -1490,6 +1940,10 @@ class SiYuanXref extends Plugin {
         // 全局 fetch 探针**默认不装**：它会给思源每一个 /api/ 请求都 clone 响应、解析 JSON，
         // 长期挂着会白白拖慢整个应用。只在排查问题时（设置里打开「诊断日志」）才装。
         this.settings = Object.assign({}, DEFAULTS, (await this.loadData("settings.json")) || {});
+        // 标签留空 = 跟界面语言（英文思源首次安装出 Figure/Table/Eq，老用户已存的值一律不动）
+        if (!this.settings.figLabel) this.settings.figLabel = tr("label.fig");
+        if (!this.settings.tabLabel) this.settings.tabLabel = tr("label.tab");
+        if (!this.settings.eqLabel) this.settings.eqLabel = tr("label.eq");
         // 1.0.1 一次性迁移：旧默认 text 会把 ((块ID)) 烧掉、块恢复也接不回来。
         // 已经写在 settings.json 里的旧值不会自动变成新默认，所以这里强制改一次并打标记，
         // 之后用户自己再选「转成文本」就不再干预
@@ -1511,12 +1965,12 @@ class SiYuanXref extends Plugin {
         try { await this.saveData("settings.json", this.settings); } catch (e) {}
         this.setting = new Setting({ confirmCallback: () => this.saveSettings() });
         this.setting.addItem({
-            title: "编号模式",
-            description: "全文连续（图 1、图 2）或按一级标题分章（图 1-1、图 2-1）",
+            title: tr("set.mode.title"),
+            description: tr("set.mode.desc"),
             createActionElement: () => {
                 const sel = document.createElement("select");
                 sel.className = "b3-select fn__size200";
-                [["continuous", "全文连续"], ["chapter", "按章编号"]].forEach(([v, t]) => {
+                [["continuous", tr("set.mode.continuous")], ["chapter", tr("set.mode.chapter")]].forEach(([v, t]) => {
                     const o = document.createElement("option");
                     o.value = v;
                     o.textContent = t;
@@ -1528,11 +1982,12 @@ class SiYuanXref extends Plugin {
             },
         });
         this.setting.addItem({
-            title: "图 / 表 / 式 标签",
-            description: "题注前缀文字，例如填 Figure / Table / Eq",
+            title: tr("set.labels.title"),
+            description: tr("set.labels.desc"),
             createActionElement: () => {
                 const box = document.createElement("div");
-                [["figLabel", "图"], ["tabLabel", "表"], ["eqLabel", "式"]].forEach(([k, ph]) => {
+                [["figLabel", tr("label.fig")], ["tabLabel", tr("label.tab")],
+                    ["eqLabel", tr("label.eq")]].forEach(([k, ph]) => {
                     const inp = document.createElement("input");
                     inp.className = "b3-text-field fn__size80";
                     inp.placeholder = ph;
@@ -1545,8 +2000,8 @@ class SiYuanXref extends Plugin {
             },
         });
         this.setting.addItem({
-            title: "重排时同步刷新引用",
-            description: "把 ((块ID \"旧锚文本\")) 全部改成新编号。关闭后只改编号不动引用",
+            title: tr("set.refs.title"),
+            description: tr("set.refs.desc"),
             createActionElement: () => {
                 const inp = document.createElement("input");
                 inp.type = "checkbox";
@@ -1558,8 +2013,8 @@ class SiYuanXref extends Plugin {
         });
 
         this.setting.addItem({
-            title: "自动重排",
-            description: "写完题注停手 1.5 秒后自动重排编号并刷新引用。不会写入光标所在的块，避免打断输入",
+            title: tr("set.auto.title"),
+            description: tr("set.auto.desc"),
             createActionElement: () => {
                 const inp = document.createElement("input");
                 inp.type = "checkbox";
@@ -1573,10 +2028,8 @@ class SiYuanXref extends Plugin {
             },
         });
         this.setting.addItem({
-            title: "文字自动识别",
-            description: "正文以「图 3 ……」「表 2 ……」开头的段落自动当作题注参与编号。关掉后只认" +
-                "右键菜单设的题注（custom-xref 属性）——正文里顺口写到「图 3 中可以看出」这种普通段落" +
-                "就不会被误编号。自动识别本来就要等索引进位，慢一点没关系；右键设的题注不受此开关影响，点了立刻生效",
+            title: tr("set.detect.title"),
+            description: tr("set.detect.desc"),
             createActionElement: () => {
                 const inp = document.createElement("input");
                 inp.type = "checkbox";
@@ -1590,17 +2043,15 @@ class SiYuanXref extends Plugin {
             },
         });
         this.setting.addItem({
-            title: "失效引用怎么处理",
-            description: "指向已删块、或指向「已取消题注」的块的引用。默认「不处理」：引用原样留着，删块后按 Ctrl+Alt+Z 能把块重建回来、" +
-                "引用自动接回；「仅标红」会在正文里涂红加删除线（看着像内容被改坏）；" +
-                "「转成文本」会让引用彻底失效、无法还原，还会等 10 秒才动手",
+            title: tr("set.dead.title"),
+            description: tr("set.dead.desc"),
             createActionElement: () => {
                 const sel = document.createElement("select");
                 sel.className = "b3-select fn__size200";
                 [
-                    ["off", "不处理，保持原样（推荐）"],
-                    ["mark", "仅标红，保留引用"],
-                    ["text", "转成红色删除线文本（不可逆）"],
+                    ["off", tr("set.dead.off")],
+                    ["mark", tr("set.dead.mark")],
+                    ["text", tr("set.dead.text")],
                 ].forEach(([v, t]) => {
                     const o = document.createElement("option");
                     o.value = v;
@@ -1619,8 +2070,8 @@ class SiYuanXref extends Plugin {
         });
 
         this.setting.addItem({
-            title: "题注居中",
-            description: "重排时把「图 N …」「表 N …」题注段落设为居中",
+            title: tr("set.center.title"),
+            description: tr("set.center.desc"),
             createActionElement: () => {
                 const inp = document.createElement("input");
                 inp.type = "checkbox";
@@ -1635,16 +2086,16 @@ class SiYuanXref extends Plugin {
         });
 
         this.setting.addItem({
-            title: "题注底色",
-            description: "给「图 N …」「表 N …」题注加一层很淡的底色，暗色主题下也看得清；自己设过底色的不会被改",
+            title: tr("set.bg.title"),
+            description: tr("set.bg.desc"),
             createActionElement: () => {
                 const sel = document.createElement("select");
                 sel.className = "b3-select fn__size200";
                 [
-                    ["none", "无底色"],
-                    ["faint", "极浅"],
-                    ["light", "浅（默认）"],
-                    ["blue", "浅蓝"],
+                    ["none", tr("set.bg.none")],
+                    ["faint", tr("set.bg.faint")],
+                    ["light", tr("set.bg.light")],
+                    ["blue", tr("set.bg.blue")],
                 ].forEach(([v, t]) => {
                     const o = document.createElement("option");
                     o.value = v;
@@ -1662,9 +2113,8 @@ class SiYuanXref extends Plugin {
 
         // 自定义快捷键：点输入框后直接按组合键，录完立刻生效并落盘
         this.setting.addItem({
-            title: "自定义快捷键",
-            description: "点一下输入框，再按下想用的组合键（必须带 Ctrl / Alt / ⌘）。Backspace 清空，Esc 取消。" +
-                "同时也会出现在「设置 → 快捷键 → 插件」里，两处改都行",
+            title: tr("set.keys.title"),
+            description: tr("set.keys.desc"),
             createActionElement: () => {
                 // 竖排两行：设置面板右侧这一栏窄，横着放开两个框会被裁掉
                 const box = document.createElement("div");
@@ -1672,8 +2122,8 @@ class SiYuanXref extends Plugin {
                 box.style.flexDirection = "column";
                 box.style.rowGap = "6px";
                 box.style.width = "190px";
-                [["keyInsert", "插入交叉引用"], ["keyRenumber", "重排编号"],
-                 ["keyUndo", "撤销上次重排"], ["keyRedo", "重做"]].forEach(([k, label]) => {
+                [["keyInsert", tr("set.keys.insert")], ["keyRenumber", tr("set.keys.renumber")],
+                 ["keyUndo", tr("set.keys.undo")], ["keyRedo", tr("set.keys.redo")]].forEach(([k, label]) => {
                     const wrap = document.createElement("div");
                     wrap.style.display = "flex";
                     wrap.style.alignItems = "center";
@@ -1691,13 +2141,13 @@ class SiYuanXref extends Plugin {
                     inp.readOnly = true;
                     inp.style.cursor = "pointer";
                     inp.style.textAlign = "center";
-                    inp.placeholder = "未设置";
+                    inp.placeholder = tr("set.keys.unset");
                     inp.value = this.settings[k] || "";
-                    inp.title = "点击后按下组合键";
-                    inp.addEventListener("focus", () => { inp.value = ""; inp.placeholder = "请按组合键…"; });
+                    inp.title = tr("set.keys.tip");
+                    inp.addEventListener("focus", () => { inp.value = ""; inp.placeholder = tr("set.keys.press"); });
                     inp.addEventListener("blur", () => {
                         inp.value = this.settings[k] || "";
-                        inp.placeholder = "未设置";
+                        inp.placeholder = tr("set.keys.unset");
                     });
                     inp.addEventListener("keydown", (ev) => {
                         // 录键期间拦住一切：别让 Ctrl+Alt+R 同时触发文档里的动作
@@ -1707,7 +2157,7 @@ class SiYuanXref extends Plugin {
                         if (ev.key === "Backspace" || ev.key === "Delete") {
                             this.settings[k] = "";
                             inp.value = "";
-                            inp.placeholder = "未设置";
+                            inp.placeholder = tr("set.keys.unset");
                             this.saveSettings();
                             return;
                         }
@@ -1726,8 +2176,8 @@ class SiYuanXref extends Plugin {
         });
 
         this.setting.addItem({
-            title: "撤销步数",
-            description: "插件自己记多少轮重排可以撤回（1~50）。思源的 Ctrl+Z 撤不到插件写入，所以单独记一份",
+            title: tr("set.undo.title"),
+            description: tr("set.undo.desc"),
             createActionElement: () => {
                 const inp = document.createElement("input");
                 inp.className = "b3-text-field fn__size200";
@@ -1750,18 +2200,18 @@ class SiYuanXref extends Plugin {
         });
 
         this.setting.addItem({
-            title: "还原失效引用",
-            description: "把以前被「转成文本」烧掉的引用改回 ((块ID \"锚\"))。目标块已删除的会自动跳过",
+            title: tr("set.restore.title"),
+            description: tr("set.restore.desc"),
             createActionElement: () => {
                 const btn = document.createElement("button");
                 btn.className = "b3-button b3-button--outline fn__size200";
-                btn.textContent = "还原当前文档";
+                btn.textContent = tr("set.restore.btn");
                 btn.addEventListener("click", () => {
                     btn.disabled = true;
-                    btn.textContent = "还原中…";
+                    btn.textContent = tr("set.restore.busy");
                     this.restoreDeadRefs()
                         .catch((e) => { logErr("restoreDead", e); })
-                        .finally(() => { btn.disabled = false; btn.textContent = "还原当前文档"; });
+                        .finally(() => { btn.disabled = false; btn.textContent = tr("set.restore.btn"); });
                 });
                 return btn;
             },
@@ -1769,8 +2219,8 @@ class SiYuanXref extends Plugin {
 
         // 诊断开关：默认关。开着会拦全局 fetch，长期开必然拖慢思源，排查完记得关掉
         this.setting.addItem({
-            title: "诊断日志（排查用）",
-            description: "开启后会拦截全局网络请求并写 ws-log.json / err-log.json。**只在排查问题时开，平时请关闭**，会拖慢思源",
+            title: tr("set.debug.title"),
+            description: tr("set.debug.desc"),
             createActionElement: () => {
                 const inp = document.createElement("input");
                 inp.type = "checkbox";
@@ -1803,6 +2253,9 @@ class SiYuanXref extends Plugin {
         this._deadIds = [];
         this._deadSig = "";
         this._emptySig = "";
+        // 刚取消题注的块：id -> 名单到期时间。给自动轮一个硬性的「别碰」名单，
+        // 挡住 blocks 表索引滞后那 0.6~2s（甚至更久）里「旧文字把它重新认成题注」的可能。
+        this._cancelGuard = new Map();
 
         // 记住当前文档的 protyle，自动重排时用；顺手把已失效的引用标红
         const remember = (e) => {
@@ -1823,8 +2276,8 @@ class SiYuanXref extends Plugin {
             let touched = false;
             const acts = this._debug ? [] : null; // 不在诊断模式就别攒这个数组了
             try {
-                for (const tr of (d.data || [])) {
-                    for (const op of (tr.doOperations || [])) {
+                for (const trx of (d.data || [])) {
+                    for (const op of (trx.doOperations || [])) {
                         const a = op && op.action;
                         if (acts) acts.push(a);
                         if (op && op.id) this.markEdit(op.id);
@@ -1890,7 +2343,7 @@ class SiYuanXref extends Plugin {
         if (act === "insert") {
             this.openPicker(p, nodeEl).catch((e) => {
                 logErr("hotkey:insert", e);
-                showMessage("siyuan-xref 出错：" + (e && e.message ? e.message : e), 8000, "error");
+                showMessage(tr("msg.error", e && e.message ? e.message : e), 8000, "error");
             });
         } else if (act === "num") {
             this.renumber(p).catch((e) => { logErr("hotkey:num", e); });
@@ -2065,12 +2518,38 @@ class SiYuanXref extends Plugin {
             return this.captionLook(protyle, id);
         };
         const r = captionMenu(els, look);
+        // 「插入交叉引用…」给谁（2026-11-01 用户第三次明确）：
+        //   ✅ 正文文字上右键 —— 普通段落、标题、列表项（mode === "para"），以及表格单元格里的文字。
+        //      引用是写在文字中间的动作，入口就该在文字右键里。
+        //   ❌ 块标（块左侧小图标）菜单不给；❌ 图片/表格本身也不给（那里应该先有题注）。
+        // 插在**当前光标处**：openPicker 默认就用选区，绝不传 forceAnchor（传了会定死到块末尾，
+        // 反而丢掉用户在单元格里点的位置）。
+        const wantRef = r.ok ? r.mode === "para"
+            : (r.reason === "table" && els.some((x) => !x.img));
+        const refItem = () => ({
+            icon: "iconRef",
+            label: tr("menu.ref"),
+            click: () => {
+                const p = protyle || this._lastProtyle || null;
+                this.openPicker(p, null).catch((err) => {
+                    logErr("blockmenu/ref", err);
+                    showMessage(tr("msg.error", err && err.message ? err.message : err), 6000, "error");
+                });
+            },
+        });
+        const root0 = menuItemRoot(host);
+        const before0 = root0 && root0.children ? root0.children.length : 0;
         if (!r.ok) {
-            // 表格单元格 / 公式块 / 混选：放一条灰掉的说明，让用户知道该右键哪儿，而不是以为插件没反应
-            // 正文右键（quiet）不加：那里已经有思源自己的图片/表格菜单，再塞一条灰字只是噪音
+            // 单元格里的文字只给这一项（往单元格写编号会把表搞坏，所以没有题注项）
+            if (wantRef) {
+                host.addItem(refItem());
+                promoteMenuItems(host, before0);
+                this.logMenuTree(host);
+                return;
+            }
+            // 公式块 / 混选 / 单元格里的图片：放一条灰掉的说明，让用户知道该右键哪儿，
+            // 而不是以为插件没反应。正文右键（quiet）不加：那里已经有思源自己的菜单，再塞一条灰字只是噪音
             if (!quiet && r.reason && r.reason !== "empty") {
-                const root0 = menuItemRoot(host);
-                const before0 = root0 && root0.children ? root0.children.length : 0;
                 host.addItem({
                     icon: "iconInfo",
                     label: menuHint(r.reason),
@@ -2104,18 +2583,20 @@ class SiYuanXref extends Plugin {
                     }
                     job.catch((err) => {
                         logErr("blockmenu/" + it.key, err);
-                        showMessage("siyuan-xref 出错：" + (err && err.message ? err.message : err), 6000, "error");
+                        showMessage(tr("msg.error", err && err.message ? err.message : err), 6000, "error");
                     });
                 },
             });
         }
+        if (wantRef) host.addItem(refItem());
         promoteMenuItems(host, before);
         this.logMenuTree(host);
     }
 
     /** kind 该以什么打头：优先用户自己配的标签，再兜中英文默认 */
     captionHeadRe(kind) {
-        const lab = kind === "fig" ? (this.settings.figLabel || "图") : (this.settings.tabLabel || "表");
+        const lab = kind === "fig" ? (this.settings.figLabel || tr("label.fig"))
+            : (this.settings.tabLabel || tr("label.tab"));
         const esc = String(lab).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const alt = kind === "fig" ? "图|Figure" : "表|Table";
         return new RegExp("^\\s*(" + esc + "|" + alt + ")\\s*\\d");
@@ -2213,18 +2694,24 @@ class SiYuanXref extends Plugin {
     async setCaption(ids, kind, protyle) {
         if (!ids || !ids.length) return;
         const p = protyle || this._lastProtyle || null;
-        if (!getDocId(p)) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
-        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
+        if (!getDocId(p)) { showMessage(tr("msg.noDoc"), 4000, "error"); return; }
+        // 又设回题注了：立刻从「取消别碰」名单里放出来，否则编号会被挡
+        this.forgetCancelled(ids);
+        // 自动轮正在跑的时候排队等它收工，别静默丢掉这次点击（以前是弹一句就 return）
+        if (!(await this.waitIdle(3000))) {
+            showMessage(tr("msg.busy"), 4000, "error");
+            return;
+        }
         for (const id of ids) {
             await retry(() => api("/api/attr/setBlockAttrs", { id: id, attrs: { "custom-xref": kind } }));
         }
         const left = await this.commitCaption(ids, kind, p);
-        const word = kind === "fig" ? "图" : "表";
+        const word = kind === "fig" ? tr("label.fig") : tr("label.tab");
         if (left.length) {
             await logErr("setCaption/not-numbered", new Error("未编号: " + left.join(",")));
-            showMessage("siyuan-xref：属性已写入，编号稍后自动补上（" + left.length + " 处）", 4000);
+            showMessage(tr("msg.attrWritten", left.length), 4000);
         } else {
-            showMessage("已设为" + word + "题注" + (ids.length > 1 ? " " + ids.length + " 处" : ""), 2000);
+            showMessage(tr("msg.setDone", word, ids.length > 1 ? tr("msg.nBlocks", ids.length) : ""), 2000);
         }
     }
 
@@ -2240,8 +2727,11 @@ class SiYuanXref extends Plugin {
     async addCaption(ids, kind, protyle) {
         if (!ids || !ids.length) return;
         const p = protyle || this._lastProtyle || null;
-        if (!getDocId(p)) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
-        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
+        if (!getDocId(p)) { showMessage(tr("msg.noDoc"), 4000, "error"); return; }
+        if (!(await this.waitIdle(3000))) {
+            showMessage(tr("msg.busy"), 4000, "error");
+            return;
+        }
         const above = kind === "tab";
         const made = [];
         for (const id of ids) {
@@ -2261,56 +2751,145 @@ class SiYuanXref extends Plugin {
             made.push(nid);
         }
         if (!made.length) {
-            showMessage("siyuan-xref：没能在图/表旁边插入题注段落，请重试", 5000, "error");
+            showMessage(tr("msg.addFail"), 5000, "error");
             return;
         }
         const left = await this.commitCaption(made, kind, p);
-        const word = kind === "fig" ? "图" : "表";
+        const word = kind === "fig" ? tr("menu.word.fig") : tr("menu.word.tab");
         if (left.length) {
             await logErr("addCaption/not-numbered", new Error("未编号: " + left.join(",")));
-            showMessage("siyuan-xref：题注段落已插入，编号稍后自动补上", 4000);
+            showMessage(tr("msg.addPending"), 4000);
         } else {
-            showMessage("已在" + (above ? "上方" : "下方") + "添加" + word + "题注" +
-                (made.length > 1 ? " " + made.length + " 处" : "") + "，可直接补写说明", 2600);
+            showMessage(tr("msg.addDone", above ? tr("menu.where.above") : tr("menu.where.below"), word,
+                made.length > 1 ? tr("msg.nBlocks", made.length) : ""), 2600);
         }
+    }
+
+    /**
+     * 自动重排正在跑的时候点了菜单项，**不能静默丢掉**。
+     * 以前的写法是 `if (this._running) { showMessage("请稍候再试"); return; }` ——
+     * 用户点了「取消图表题注」，程序弹一句就结束了，什么也没做，
+     * 这就是 1.0.3「取消题注失效」最直接的一条原因（自动轮很频繁，撞上的概率不低）。
+     * 现在改成排队：最多等 3 秒，重排一收工就执行；真等不到才报错，且明确写出「未执行」。
+     */
+    async whenIdle(label, fn) {
+        if (!(await this.waitIdle(3000))) {
+            await logErr("menu/" + label, new Error("重排长时间未结束，本次操作未执行"));
+            showMessage(tr("msg.busy"), 4000, "error");
+            return null;
+        }
+        try {
+            return await fn();
+        } catch (e) {
+            await logErr("menu/" + label, e);
+            showMessage(tr("msg.error", e && e.message ? e.message : e), 6000, "error");
+            return null;
+        }
+    }
+
+    /** 最多等 maxMs，重排收工了就返回 true */
+    async waitIdle(maxMs) {
+        const end = Date.now() + (maxMs || 3000);
+        while (this._running && Date.now() < end) await sleep(250);
+        return !this._running;
+    }
+
+    /** 把刚取消的块记进「别碰」名单（默认 30 秒，足够覆盖索引延迟） */
+    markCancelled(ids) {
+        if (!this._cancelGuard) this._cancelGuard = new Map();
+        const until = Date.now() + 30000;
+        (ids || []).forEach((id) => { if (id) this._cancelGuard.set(id, until); });
+    }
+
+    /** 取当前仍在名单里的块 id（顺手清掉过期的，不落盘、自愈） */
+    cancelledIds() {
+        if (!this._cancelGuard) this._cancelGuard = new Map();
+        const now = Date.now();
+        const out = [];
+        this._cancelGuard.forEach((t, id) => {
+            if (t > now) out.push(id); else this._cancelGuard.delete(id);
+        });
+        return out;
+    }
+
+    /** 又设回题注了 → 立刻从名单里放出来，别挡着编号 */
+    forgetCancelled(ids) {
+        if (!this._cancelGuard) return;
+        (ids || []).forEach((id) => this._cancelGuard.delete(id));
     }
 
     /**
      * 右键图片/表格点「取消图表题注」的兜底：现场找它旁边那个题注段落。
      * 方向同插入：图往下看、表往上看。（菜单里通常已经算出来了，这条只在拿不到 DOM 时用。）
+     * 只认同方向的题注（用户 2026-11-01 选 B）：题注写到反方向去了，就提示去右键它本身。
      */
     async clearCaptionNear(ids, kind, protyle) {
         if (!ids || !ids.length) return;
         const p = protyle || this._lastProtyle || null;
         const docId = getDocId(p);
-        if (!docId) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
-        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
-        let blocks = [];
-        try { blocks = await collectBlocks(docId); } catch (e) { blocks = []; }
-        const at = {};
-        blocks.forEach((b, i) => { at[b.id] = i; });
-        const up = kind === "tab";
-        const targets = [];
-        for (const id of ids) {
-            const i = at[id];
-            if (i === undefined) continue;
-            const step = up ? -1 : 1;
-            // 最多看两格：中间可能夹着一个空段落
-            for (let n = 1; n <= 2; n++) {
-                const j = i + step * n;
-                if (j < 0 || j >= blocks.length) break;
-                const b = blocks[j];
-                if (b.type !== "p") break;
-                const k = classify(b, this.settings);
-                if (k) { if (!kind || k === kind) targets.push(b.id); break; }
-                if (String(b.markdown || "").trim()) break;   // 有正文却不是题注 → 不是它
+        if (!docId) { showMessage(tr("msg.noDoc"), 4000, "error"); return; }
+        return this.whenIdle("clear-near", async () => {
+            const grab = async () => {
+                let bs = [];
+                try { bs = await collectBlocks(docId); } catch (e) { bs = []; }
+                const map = {};
+                bs.forEach((b, i) => { map[b.id] = i; });
+                return { bs: bs, map: map };
+            };
+            let got = await grab();
+            // blocks 表刚写入时可能还查不到这一块（实测 0.6~2s，偶发更久）。采不到位置就再采，
+            // 否则「找不到题注」的提示其实是「没找到这张图」，会把人带偏。
+            for (let i = 0; i < 3 && ids.some((id) => got.map[id] === undefined); i++) {
+                await sleep(500);
+                got = await grab();
             }
-        }
-        if (!targets.length) {
-            showMessage("siyuan-xref：没找到该" + (up ? "表上方" : "图下方") + "的题注段落", 3500);
-            return;
-        }
-        await this.clearCaption(targets, p);
+            const blocks = got.bs, at = got.map;
+            const up = kind === "tab";
+            const targets = [];
+            const onWrongSide = [];
+            const lost = [];
+            for (const id of ids) {
+                const i = at[id];
+                if (i === undefined) { lost.push(id); continue; }
+                const step = up ? -1 : 1;
+                // 最多看两格：中间可能夹着一个空段落
+                for (let n = 1; n <= 2; n++) {
+                    const j = i + step * n;
+                    if (j < 0 || j >= blocks.length) break;
+                    const b = blocks[j];
+                    if (b.type !== "p") break;
+                    const k = classify(b, this.settings);
+                    if (k) { if (!kind || k === kind) targets.push(b.id); break; }
+                    if (String(b.markdown || "").trim()) break;   // 有正文却不是题注 → 不是它
+                }
+                if (targets.length) continue;
+                // 反方向扫一眼只为了**把话说准**，不做任何写入：
+                // 这一步能区分「真的是普通图片」和「题注放到了图的上方」
+                for (let n = 1; n <= 2; n++) {
+                    const j = i - step * n;
+                    if (j < 0 || j >= blocks.length) break;
+                    if (blocks[j].type !== "p") break;
+                    const k = classify(blocks[j], this.settings);
+                    if (k) { onWrongSide.push(blocks[j].id); break; }
+                    if (String(blocks[j].markdown || "").trim()) break;
+                }
+            }
+            this.trace({ clearNear: "lookup", ids: ids, hit: targets.length, wrong: onWrongSide.length,
+                lost: lost.length, kind: kind || "?" });
+            if (!targets.length) {
+                const side = up ? tr("menu.where.above") : tr("menu.where.below");
+                if (lost.length) {
+                    // 连这块本身都没在快照里 —— 这是索引延迟，不是「没有题注」，别误导
+                    showMessage(tr("msg.notIndexed"), 3500);
+                } else if (onWrongSide.length) {
+                    showMessage(tr("msg.wrongSide", up ? tr("noun.table") : tr("noun.image"), side), 5000);
+                } else {
+                    showMessage(tr("msg.noNeighbor", up ? tr("label.tab") : tr("label.fig"), side), 4500);
+                }
+                return;
+            }
+            await this.clearCaption(targets, p);
+        });
     }
 
     /**
@@ -2320,13 +2899,44 @@ class SiYuanXref extends Plugin {
      * 带着块自己的 IAL —— 属性还没清就回传，会把 custom-xref="fig" 原样写回去，
      * 而且这次回写的落地比 setBlockAttrs 还晚，表现就是「编号没了但属性还在，
      * 下一轮又变回题注、后面的编号也不顺延」（1.0.3 快通道测试抓到的真 bug）。
+     *
+     * ⚠ 入口先排队（whenIdle），不再「正在重排就直接放弃」：自动轮很频繁，撞上就白点一次，
+     * 这是 1.0.3「取消题注点了没反应」最直接的一条原因。
      */
     async clearCaption(ids, protyle) {
         if (!ids || !ids.length) return;
         const p = protyle || this._lastProtyle || null;
         const docId = getDocId(p);
-        if (!docId) { showMessage("siyuan-xref：未取到当前文档", 4000, "error"); return; }
-        if (this._running) { showMessage("siyuan-xref：正在重排，请稍候再试", 3000); return; }
+        if (!docId) { showMessage(tr("msg.noDoc"), 4000, "error"); return; }
+        // 先占「别碰」名单：等重排收工这段时间里，它也不会把这块重新当成题注编一次号
+        this.markCancelled(ids);
+        this.trace({ clear: "enter", doc: docId, n: ids.length, ids: ids.join(","), busy: !!this._running });
+        return this.whenIdle("clear", () => this.clearCaptionNow(ids, p));
+    }
+
+    /** 取块正文（kramdown 去掉末行 IAL）。返回 null = 读不到，调用方别据此下判断 */
+    async kramdownBody(id) {
+        try {
+            const r = await api("/api/block/getBlockKramdown", { id: id });
+            const k = (r && r.kramdown) ? String(r.kramdown) : "";
+            return k.replace(/\n?\{:[^}]*\}\s*$/, "");
+        } catch (e) { return null; }
+    }
+
+    /** 把剥掉编号后的正文写回去（空串要显式清空，不能直接跳过） */
+    async writeStripped(id, next, protyle) {
+        if (String(next || "").trim()) {
+            await updateContent(id, String(next).trim(), protyle, null);
+            return;
+        }
+        // 题注正文只有编号（新建题注段落最常见：整块就一个「表 1」）——
+        // 剥完是空串，这里必须显式清空。实测 updateBlock(markdown,"") 能把段落
+        // 清成空块且块本身还在（不是删块）；md 模式会丢 IAL，但此时属性已在第 1 步清完。
+        await retry(() => api("/api/block/updateBlock",
+            { id: id, dataType: "markdown", data: "" }));
+    }
+
+    async clearCaptionNow(ids, p) {
         // 1) 先清属性（getBlockAttrs 实时可读，一轮就过）
         //    连同「块命名」和题注底色一起去掉：重排时写过 name="图 3"，
         //    光清 custom-xref 会让这个块名永久残留（用户报的 bug）。
@@ -2346,30 +2956,37 @@ class SiYuanXref extends Plugin {
             await retry(() => api("/api/attr/setBlockAttrs", { id: id, attrs: attrs }));
         }
         await this.waitCaptionAttrs(ids, "");
+        this.trace({ clear: "attrs", n: ids.length, names: clearedName });
         // 2) 再剥前缀，此时 DOM 回传里已经没有 custom-xref
         let changed = 0;
         for (const id of ids) {
-            let k = "";
-            try {
-                const r = await api("/api/block/getBlockKramdown", { id: id });
-                k = (r && r.kramdown) ? String(r.kramdown) : "";
-            } catch (e) { continue; }
-            if (!k) continue;
-            // kramdown 末行是 IAL（{: id="…"}），它不是正文，别喂给 Lute
-            const body = k.replace(/\n?\{:[^}]*\}\s*$/, "");
+            const body = await this.kramdownBody(id);
+            if (body === null) continue;                 // 读不到就不动，留给下一轮
             const next = stripCaptionPrefix(body);
-            if (next === body) continue;
-            if (next.trim()) {
-                await updateContent(id, next.trim(), p, null);
-            } else {
-                // 题注正文只有编号（新建题注段落最常见：整块就一个「表 1」）——
-                // 剥完是空串，这里必须显式清空。实测 updateBlock(markdown,"") 能把段落
-                // 清成空块且块本身还在（不是删块）；md 模式会丢 IAL，但此时属性已在第 1 步清完。
-                await retry(() => api("/api/block/updateBlock",
-                    { id: id, dataType: "markdown", data: "" }));
-            }
+            if (next === body) continue;                 // 本来就没有编号前缀
+            await this.writeStripped(id, next, p);
             changed += 1;
         }
+        // 2b) 回读核实：前缀真的没了才算成功。
+        // 少了这一步，「接口返回成功、正文其实没变」会静默放过，随后自动轮凭旧文字
+        // 再把它认成题注，属性、块名、编号整套写回来 —— 现象就是「取消了又自己变回来」。
+        const stuck = [];
+        for (const id of ids) {
+            let body = await this.kramdownBody(id);
+            if (body === null) { stuck.push(id); continue; }
+            if (stripCaptionPrefix(body) === body) continue;
+            await this.writeStripped(id, stripCaptionPrefix(body), p);
+            body = await this.kramdownBody(id);
+            if (body === null || stripCaptionPrefix(body) !== body) stuck.push(id);
+        }
+        // 前缀去不掉的块**放回正常编号**：正文里明明白白写着「图 1-1」，
+        // 却把它排除在编号外，会造出「两个块都叫图 2」这种更难查的错。
+        // 这里明确告诉用户去手动删那行前缀，而不是继续按取消处理。
+        if (stuck.length) {
+            this.forgetCancelled(stuck);
+            await logErr("clearCaption/stuck", new Error("编号前缀未能去除: " + stuck.join(",")));
+        }
+        this.trace({ clear: "strip", changed: changed, stuck: stuck.length });
         // 3) 复查：万一还是被回写带回来了（老版本/别的插件插一手），再清一次
         const back = [];
         for (const id of ids) {
@@ -2386,26 +3003,28 @@ class SiYuanXref extends Plugin {
         for (const b of back) {
             await retry(() => api("/api/attr/setBlockAttrs", { id: b.id, attrs: b.attrs }));
         }
-        // 同理：不等索引，直接把「属性已清」盖到本轮采集上，编号立刻顺延
+        // 4) 重排，让后面的编号顺延。
+        //    kindOverride 把「已不是题注」盖到本轮采集上，不必等 blocks 表索引；
+        //    exclude 再上一道硬挡 —— 两道都不依赖那行旧数据，所以必定生效。
+        //    （老写法在 ready=false 时退回「等 SQL 再重排」，那条路上 SQL 只要还是旧值，
+        //     编号就会被重新写回去，取消等于没做。）
         const map = {};
         ids.forEach((id) => { map[id] = ""; });
+        const exclude = this.cancelledIds().filter((id) => ids.indexOf(id) >= 0);
         const ready = await this.waitCaptionAttrs(ids, "");
-        if (ready) {
-            await this.renumber(p, { kindOverride: map, mustInclude: ids });
-        } else {
-            await this.waitCaptionInSql(ids, "");
-            await sleep(200);
-            await this.renumber(p, { mustInclude: ids });
-        }
+        if (!ready) this.trace({ clear: "attrs-lag", ids: ids.join(",") });
+        await this.renumber(p, { kindOverride: map, mustInclude: ids, exclude: exclude });
         const bits = [];
-        if (!changed) bits.push("本来就没有编号前缀");
-        if (clearedName) bits.push("已清除块命名 " + clearedName + " 处");
+        if (!changed) bits.push(tr("msg.cancel.none"));
+        if (clearedName) bits.push(tr("msg.cancel.names", clearedName));
+        if (stuck.length) bits.push(tr("msg.cancel.stuck", stuck.length));
         // 「不处理」档下不改引用，但得让人知道有这么几处引用还挂着旧编号
         if ((this.settings.deadRefAction || "off") === "off" && this._lastOrphan) {
-            bits.push("另有 " + this._lastOrphan + " 处引用仍写着原编号");
+            bits.push(tr("msg.cancel.orphan", this._lastOrphan));
         }
-        showMessage("已取消题注" + (ids.length > 1 ? " " + ids.length + " 处" : "") +
-            (bits.length ? "（" + bits.join("，") + "）" : ""), 2500);
+        this.trace({ clear: "done", n: ids.length, stuck: stuck.length, orphan: this._lastOrphan || 0 });
+        showMessage(tr("msg.cancelled", ids.length > 1 ? tr("msg.nBlocks", ids.length) : "",
+            bits.length ? tr("msg.cancelWrap", bits.join(tr("msg.sep"))) : ""), stuck.length ? 5000 : 2500);
     }
 
     /** 只装一次全局监听；DOM 上没有编辑器时按下键也不会误伤 */
@@ -2466,7 +3085,7 @@ class SiYuanXref extends Plugin {
 
     async saveSettings() {
         await this.saveData("settings.json", this.settings);
-        showMessage("siyuan-xref：设置已保存");
+        showMessage(tr("msg.settingsSaved"));
     }
 
     /**
@@ -2477,12 +3096,12 @@ class SiYuanXref extends Plugin {
         const o = opts || {};
         // 重入保护：自动轮和手动轮同时跑会互相覆盖编号
         if (this._running) {
-            if (!o.auto) showMessage("siyuan-xref：正在重排，请稍候再试", 3000);
+            if (!o.auto) showMessage(tr("msg.renumbering"), 3000);
             return;
         }
         const docId = getDocId(protyle);
         if (!docId) {
-            if (!o.silent) showMessage("siyuan-xref：未取到当前文档", 4000, "error");
+            if (!o.silent) showMessage(tr("msg.noDoc"), 4000, "error");
             return;
         }
         this._running = true;
@@ -2504,7 +3123,17 @@ class SiYuanXref extends Plugin {
             }
             // 手动设/取消题注时，属性刚写进接口、blocks 表还没索引到，
             // 这里用参数把新属性盖在采集结果上 —— 不写库，只让编号算对
-            if (o.kindOverride) withKindOverride(blocks, o.kindOverride);
+            // 刚取消的块（含 30 秒内的自动轮）一并盖成「不是题注」：
+            // 它们正文前缀刚剥掉、SQL 里那行旧文字还在，不盖住就会被重新认成题注。
+            const excl = new Set(o.exclude || []);
+            this.cancelledIds().forEach((id) => excl.add(id));
+            if (excl.size) {
+                const map = Object.assign({}, o.kindOverride || {});
+                excl.forEach((id) => { map[id] = ""; });
+                withKindOverride(blocks, map);
+            } else if (o.kindOverride) {
+                withKindOverride(blocks, o.kindOverride);
+            }
             this.trace({ renumber: "collected", doc: docId, n: blocks.length, stale: got.stale, auto: !!o.auto });
             // 页面上有块、快照里没有 = blocks 表索引还没跟上。这时候排出来的编号一定是错的
             // （新题注根本没参与编号，旧编号也不会顺延），只能等下一轮
@@ -2543,9 +3172,9 @@ class SiYuanXref extends Plugin {
             } else {
                 this._deadPending = null;
             }
-            const r = buildPlan(blocks, this.settings, burnable);
+            const r = buildPlan(blocks, this.settings, burnable, excl);
             if (!r.plan.length && !r.refs.length) {
-                if (!o.silent) showMessage("siyuan-xref：本文档没识别到图/表/公式", 4000);
+                if (!o.silent) showMessage(tr("msg.noTargets"), 4000);
                 // 自动轮空手而归，但刚刚确实有人在敲字 —— 多半是刚写的那一行还没进索引，
                 // 或者正写一半。别就当没事发生，稍后补一轮
                 if (o.auto && this.hasFreshEdit()) {
@@ -2625,8 +3254,7 @@ class SiYuanXref extends Plugin {
             const emptyEqs = r.plan.filter((p) => p.emptyEq).map((p) => p.id);
             if (emptyEqs.length && emptyEqs.join(",") !== this._emptySig) {
                 this._emptySig = emptyEqs.join(",");
-                showMessage("siyuan-xref：有 " + emptyEqs.length +
-                    " 个公式块内容为空（只剩 \\tag），请检查公式是否丢失", 9000, "error");
+                showMessage(tr("msg.emptyEq", emptyEqs.length), 9000, "error");
             } else if (!emptyEqs.length) {
                 this._emptySig = "";
             }
@@ -2640,17 +3268,15 @@ class SiYuanXref extends Plugin {
                 } catch (e) { /* 归档失败不该影响正文 */ }
             }
             if (!o.silent) {
-                let msg = "siyuan-xref：已重排 " + r.plan.length + " 项，刷新引用 " + r.refs.length + " 处";
+                let msg = tr("msg.renumbered", r.plan.length, r.refs.length);
                 if (dead.length) {
                     if (this.settings.deadRefAction === "text") {
                         // 只有真烧掉了才说「已转成」；还在宽限期内就照实说清
                         const burned = (r.deadRefs || []).reduce((a, x) => a + (x.n || 0), 0);
                         const gs = Math.round((this.settings.deadGrace || 10000) / 1000);
-                        msg += burned
-                            ? "，另把 " + burned + " 处失效引用转成了红色删除线文本"
-                            : "，发现 " + dead.length + " 处失效引用（" + gs + " 秒后仍未恢复才转文本）";
+                        msg += burned ? tr("msg.burned", burned) : tr("msg.deadGrace", dead.length, gs);
                     } else {
-                        msg += "，发现 " + dead.length + " 处失效引用";
+                        msg += tr("msg.deadFound", dead.length);
                     }
                 }
                 showMessage(msg, 6000, dead.length ? "error" : "info");
@@ -2661,7 +3287,7 @@ class SiYuanXref extends Plugin {
             try { console.error("[siyuan-xref]", e); } catch (err) {}
             await logErr(o.auto ? "renumber:auto" : "renumber", e);
             if (!o.silent) {
-                showMessage("siyuan-xref 出错：" + (e && e.message ? e.message : e), 8000, "error");
+                showMessage(tr("msg.error", e && e.message ? e.message : e), 8000, "error");
             }
         } finally {
             this._running = false;
@@ -2678,8 +3304,7 @@ class SiYuanXref extends Plugin {
         if (!this._deadIds.length) { this._deadSig = ""; return; }
         if (sig === this._deadSig) return;
         this._deadSig = sig;
-        showMessage("siyuan-xref：" + this._deadIds.length +
-            " 处交叉引用已失效（指向已删的块，或该块已取消题注），已在正文里标红", 7000, "error");
+        showMessage(tr("msg.deadPainted", this._deadIds.length), 7000, "error");
     }
 
     /** 失效引用被改成文本前，把原文存档（最近 60 条），万一要人工恢复能查 */
@@ -2760,7 +3385,7 @@ class SiYuanXref extends Plugin {
 
     async undoLast() {
         this._undo = this._undo || [];
-        if (!this._undo.length) { showMessage("siyuan-xref：没有可撤销的重排记录", 4000); return; }
+        if (!this._undo.length) { showMessage(tr("msg.noUndo"), 4000); return; }
         const rec = this._undo.pop();
         this._quietUntil = Date.now() + 2500;   // 自己写回去的改动别被当成用户编辑再触发一轮
         let r = { n: 0, miss: 0 };
@@ -2771,15 +3396,15 @@ class SiYuanXref extends Plugin {
         this.saveUndo();
         const at = new Date(rec.t || Date.now());
         const hh = ("0" + at.getHours()).slice(-2) + ":" + ("0" + at.getMinutes()).slice(-2);
-        showMessage("siyuan-xref：已撤销 " + hh + " 那轮重排（" + r.n + " 处" +
-            (r.rebuilt ? "，重建了 " + r.rebuilt + " 个已被删除的块" : "") +
-            (r.miss ? "，" + r.miss + " 处块已不存在" : "") + "），还剩 " + this._undo.length + " 步可撤", 7000);
+        showMessage(tr("msg.undoDone", hh, r.n,
+            r.rebuilt ? tr("msg.undoRebuilt", r.rebuilt) : "",
+            r.miss ? tr("msg.undoMiss", r.miss) : "", this._undo.length), 7000);
         this.auditAndPaint();
     }
 
     async redoLast() {
         this._redo = this._redo || [];
-        if (!this._redo.length) { showMessage("siyuan-xref：没有可重做的重排记录", 4000); return; }
+        if (!this._redo.length) { showMessage(tr("msg.noRedo"), 4000); return; }
         const rec = this._redo.pop();
         this._quietUntil = Date.now() + 2500;
         let r = { n: 0, miss: 0, rebuilt: 0 };
@@ -2787,8 +3412,8 @@ class SiYuanXref extends Plugin {
         this._undo = this._undo || [];
         this._undo.push(rec);
         this.saveUndo();
-        showMessage("siyuan-xref：已重做，撤销栈 " + this._undo.length + " 步" +
-            (r.rebuilt ? "（重建 " + r.rebuilt + " 块）" : ""), 5000);
+        showMessage(tr("msg.redoDone", this._undo.length,
+            r.rebuilt ? tr("msg.redoRebuilt", r.rebuilt) : ""), 5000);
         this.auditAndPaint();
     }
 
@@ -2809,12 +3434,12 @@ class SiYuanXref extends Plugin {
         let log = [];
         try { log = (await this.loadData("dead-fix-log.json")) || []; } catch (e) { log = []; }
         if (!Array.isArray(log) || !log.length) {
-            showMessage("siyuan-xref：没有可还原的记录（dead-fix-log.json 为空）", 5000);
+            showMessage(tr("msg.noArchive"), 5000);
             return;
         }
         const rows = docId ? log.filter((x) => x.doc === docId) : log;
         if (!rows.length) {
-            showMessage("siyuan-xref：当前文档没有失效引用记录", 5000);
+            showMessage(tr("msg.noDocDead"), 5000);
             return;
         }
         const byBlock = new Map();
@@ -2851,8 +3476,7 @@ class SiYuanXref extends Plugin {
             catch (e) { missB++; }
             await sleep(120);
         }
-        showMessage("siyuan-xref：还原 " + okRef + " 处引用（" + okB + " 个块）" +
-            (missB ? "；" + missB + " 个块找不到或目标块已删" : ""), 9000);
+        showMessage(tr("msg.restored", okRef, okB, missB ? tr("msg.restoreMiss", missB) : ""), 9000);
         this.auditAndPaint();
     }
 
@@ -2975,7 +3599,13 @@ class SiYuanXref extends Plugin {
         } catch (e) {}
     }
 
-    async openPicker(protyle, nodeEl) {
+    async openPicker(protyle, nodeEl, opts) {
+        const o = opts || {};
+        // opts.anchorId = 由调用方指定「引用条插到哪个段落」，比从选区反推稳。
+        // ⚠ 1.0.5 起块右键菜单不再给「插入交叉引用」，所以当前没有调用方传这个参数；
+        // 代码保留（传空串时整条分支完全不起作用，/xref 与快捷键路径行为不变），
+        // 留给将来可能加的工具栏按钮 / 大纲入口。
+        const forceAnchor = o.anchorId || "";
         // 记住光标所在的块：面板关闭后选区会丢，插入时必须靠它找回来
         let anchorId = "";
         let savedRange = null; // 快捷键触发时，原样恢复到按键瞬间的光标位置
@@ -2999,22 +3629,30 @@ class SiYuanXref extends Plugin {
                 if (h2) anchorId = h2.getAttribute("data-node-id");
             }
         } catch (e) { anchorId = ""; }
+        if (forceAnchor) anchorId = forceAnchor;
         const docId = getDocId(protyle);
         if (!docId) {
             await logErr("openPicker", new Error("未取到当前文档 ID，protyle=" +
                 (protyle ? Object.keys(protyle).slice(0, 12).join(",") : "null")));
-            showMessage("siyuan-xref：未取到当前文档", 4000, "error");
+            showMessage(tr("msg.noDoc"), 4000, "error");
             return;
         }
         let rows = [];
+        let sections = [];
         try {
-            rows = buildPlan(await collectBlocks(docId), this.settings).plan;
+            // 用 collectFresh 而不是 collectBlocks：面板刚打开时，用户可能刚写完一个题注，
+            // blocks 表索引还没跟上（实测 0.6~2s）→ 采不到它，面板里就少一条。
+            // collectFresh 会拿页面 DOM 里的一级块 id 对照快照，缺了重采；拿不到 DOM 时行为与 collectBlocks 一致。
+            const fresh = await collectFresh(docId, protyle);
+            const built = buildPlan(fresh.blocks, this.settings);
+            rows = built.plan;
+            sections = built.sections || [];
         } catch (e) {
             await logErr("openPicker:collect", e);
-            showMessage("siyuan-xref 读取失败：" + (e && e.message ? e.message : e), 8000, "error");
+            showMessage(tr("msg.readFail", e && e.message ? e.message : e), 8000, "error");
             return;
         }
-        if (!rows.length) { showMessage("siyuan-xref：本文档没识别到图/表/公式", 4000); return; }
+        if (!rows.length) { showMessage(tr("msg.noTargets"), 4000); return; }
 
         const mask = document.createElement("div");
         mask.className = "xr-mask";
@@ -3022,27 +3660,115 @@ class SiYuanXref extends Plugin {
         panel.className = "xr-panel";
         const title = document.createElement("div");
         title.className = "xr-title";
-        title.textContent = "插入交叉引用";
+        title.textContent = tr("picker.title");
         const input = document.createElement("input");
         input.className = "b3-text-field xr-input";
-        input.placeholder = "搜索编号或题注，↑↓ 选择，回车插入，Esc 关闭";
+        input.placeholder = tr("picker.ph");
+        // 筛选条：左边是类型（全部 / 图 / 表 / 式），右边是「只看某一节」的章节下拉。
+        // 图表公式几十上百条时，光靠打字搜编号太慢（用户 2026-11-01 提）。
+        const tools = document.createElement("div");
+        tools.className = "xr-tools";
+        const chipBox = document.createElement("div");
+        chipBox.className = "xr-chips";
+        const secSel = document.createElement("select");
+        secSel.className = "b3-select xr-sec";
+        secSel.title = tr("picker.secTip");
+        tools.appendChild(chipBox);
+        tools.appendChild(secSel);
         const list = document.createElement("div");
         list.className = "xr-list";
         panel.appendChild(title);
+        panel.appendChild(tools);
         panel.appendChild(input);
         panel.appendChild(list);
         mask.appendChild(panel);
         document.body.appendChild(mask);
         input.focus();
 
-        let items = rows.slice();
+        // 公式行要渲染成真公式（用户 2026-11-01 反馈：别显示 $$ y=1-sin(x) \tag{2-1} $$ 这种源码）
+        const renderMath = await ensureMathRenderer();
+        /** 一行的右侧预览：公式→渲染，其余→纯文字 */
+        const previewOf = (x) => {
+            if (x.kind === "eq") {
+                const tex = eqTex(x.curMd || x.oldMd);
+                if (!tex) return '<span class="xr-tex">' + esc(x.name) + "</span>";
+                const html = renderMath ? renderMath(tex) : "";
+                // 渲染不出来就显示等宽 LaTeX（已去掉 $$ 与 \tag），至少是能读的源码
+                return html ? '<span class="xr-math">' + html + "</span>"
+                    : '<span class="xr-tex">' + esc(tex.slice(0, 60)) + "</span>";
+            }
+            return esc(String(x.oldMd || "").replace(/\n/g, " ").slice(0, 50));
+        };
+        // ── 筛选：类型（图/表/式） + 所属标题 ────────────────────────────
+        let typeFilter = "";   // "" 全部 | fig | tab | eq
+        let secFilter = "";    // "" 全部 | 标题块 id
+        let items = [];
         let cur = 0;
+        /** 章节 + 搜索词都满足的项（不含类型判断）——chip 上的计数用它 */
+        const baseRows = () => filterPickerRows(rows, { secId: secFilter, q: input.value });
+        const applyFilter = () => filterPickerRows(rows,
+            { kind: typeFilter, secId: secFilter, q: input.value });
+
+        const chips = [];
+        [["", tr("picker.all")], ["fig", tr("label.fig")],
+         ["tab", tr("label.tab")], ["eq", tr("label.eq")]].forEach(([k, label]) => {
+            const chip = document.createElement("div");
+            // tabindex=-1：鼠标点得动，但 Tab 和方向键还是留在输入框里，不打乱 ↑↓ 选行
+            chip.setAttribute("tabindex", "-1");
+            chip.className = "xr-chip" + (k === "" ? " xr-chip-on" : "");
+            chip.addEventListener("mousedown", (ev) => {
+                ev.preventDefault();
+                // 再点一次当前类型 = 取消，回到全部
+                typeFilter = (k && typeFilter !== k) ? k : "";
+                refresh();
+            });
+            chips.push({ el: chip, kind: k, label: label });
+            chipBox.appendChild(chip);
+        });
+        /** 刷新 chip 文字（带各类条数）和高亮 */
+        const paintChips = () => {
+            const base = baseRows();
+            const n = { "": base.length, fig: 0, tab: 0, eq: 0 };
+            base.forEach((x) => { n[x.kind] = (n[x.kind] || 0) + 1; });
+            chips.forEach((c) => {
+                c.el.textContent = c.label + " (" + n[c.kind] + ")";
+                c.el.classList.toggle("xr-chip-on", c.kind === typeFilter);
+            });
+        };
+
+        // 章节下拉：只列「真的有图/表/式」的标题，免得长文档里一整屏都是空节
+        const secIds = new Set();
+        rows.forEach((x) => { if (x.hPath) x.hPath.split("/").forEach((id) => secIds.add(id)); });
+        const optAll = document.createElement("option");
+        optAll.value = "";
+        optAll.textContent = tr("picker.allSec");
+        secSel.appendChild(optAll);
+        let secCount = 0;
+        sections.forEach((sec) => {
+            if (!secIds.has(sec.id)) return;
+            const opt = document.createElement("option");
+            opt.value = sec.id;
+            // H2 缩进两格 → 一眼看出层级，跟思源大纲的缩进习惯一致
+            opt.textContent = "H" + sec.lv + " " + new Array(Math.max(0, sec.lv)).join("\u3000") +
+                (sec.text || tr("picker.secNone"));
+            secSel.appendChild(opt);
+            secCount += 1;
+        });
+        // 整篇一个标题都没有（纯图片集 / 单节文档）：藏起来，别白占一行
+        if (!secCount) secSel.style.display = "none";
+        secSel.addEventListener("change", () => {
+            secFilter = secSel.value;
+            refresh();
+        });
+        // 下拉会把焦点抢走，选完还给输入框，否则 ↑↓ / Enter 全失效
+        secSel.addEventListener("blur", () => { try { input.focus(); } catch (e) { /* 忽略 */ } });
+
         const render = () => {
             list.innerHTML = "";
             if (!items.length) {
                 const empty = document.createElement("div");
                 empty.className = "xr-empty";
-                empty.textContent = "没有匹配项";
+                empty.textContent = tr("picker.empty");
                 list.appendChild(empty);
                 return;
             }
@@ -3050,7 +3776,7 @@ class SiYuanXref extends Plugin {
                 const it = document.createElement("div");
                 it.className = "xr-item" + (i === cur ? " xr-cur" : "");
                 it.innerHTML = '<span class="xr-name">' + esc(x.name) + "</span>" +
-                    '<span class="xr-preview">' + esc(x.oldMd.replace(/\n/g, " ").slice(0, 50)) + "</span>";
+                    '<span class="xr-preview">' + previewOf(x) + "</span>";
                 it.addEventListener("mousedown", (ev) => { ev.preventDefault(); pick(x); });
                 it.addEventListener("mousemove", () => {
                     if (cur !== i) { cur = i; render(); }
@@ -3070,7 +3796,10 @@ class SiYuanXref extends Plugin {
                 ? document.querySelector('.protyle-wysiwyg [data-node-id="' + anchorId + '"]')
                 : null;
             let restored = false;
-            if (slashRangeIn(anchorEl)) {
+            if (forceAnchor) {
+                // 右键菜单：直接插到那个段落的末尾（不认斜杠残留，免得误删正文）
+                restored = caretToBlockEnd(anchorId);
+            } else if (slashRangeIn(anchorEl)) {
                 restored = restoreCaret(anchorId);
             } else if (savedRange) {
                 try {
@@ -3083,7 +3812,7 @@ class SiYuanXref extends Plugin {
             if (!restored) restored = restoreCaret(anchorId);
             if (!restored) {
                 // 宁可不插，也不能插到文档开头污染正文
-                showMessage("siyuan-xref：定位不到 /xref 所在位置，已取消插入。请把光标放到目标段落再试", 8000, "error");
+                showMessage(forceAnchor ? tr("picker.noAnchor") : tr("picker.noSlash"), 8000, "error");
                 return;
             }
             const runInsert = () => {
@@ -3098,11 +3827,13 @@ class SiYuanXref extends Plugin {
             } catch (e) {
                 logErr("openPicker:insert", e);
                 try { document.execCommand("insertHTML", false, html); }
-                catch (e2) { showMessage("插入失败：" + (e && e.message ? e.message : e), 6000, "error"); return; }
+                catch (e2) { showMessage(tr("msg.insertFail", e && e.message ? e.message : e), 6000, "error"); return; }
             }
 
         };
         const onKey = (ev) => {
+            // 章节下拉自己要用方向键，别在这里截走
+            if (ev.target === secSel) return;
             if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); close(); return; }
             if (ev.key === "ArrowDown") { ev.preventDefault(); cur = Math.min(cur + 1, items.length - 1); render(); return; }
             if (ev.key === "ArrowUp") { ev.preventDefault(); cur = Math.max(cur - 1, 0); render(); return; }
@@ -3113,14 +3844,16 @@ class SiYuanXref extends Plugin {
             }
         };
         document.addEventListener("keydown", onKey, true);
-        input.addEventListener("input", () => {
-            const q = input.value.trim().toLowerCase();
-            items = q ? rows.filter((x) => (x.name + " " + x.oldMd).toLowerCase().indexOf(q) >= 0) : rows.slice();
+        /** 筛选条件变了：重算列表 + 重算 chip 计数 + 回到第一行 */
+        const refresh = () => {
+            items = applyFilter();
             cur = 0;
+            paintChips();
             render();
-        });
+        };
+        input.addEventListener("input", refresh);
         mask.addEventListener("mousedown", (ev) => { if (ev.target === mask) close(); });
-        render();
+        refresh();
     }
 }
 
@@ -3131,6 +3864,7 @@ SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyP
     isBlockAlive: isBlockAlive, aliveMap: aliveMap, dropStaleDead: dropStaleDead, collectRaw: collectRaw,
     ownVersion: ownVersion,
     slashRangeIn: slashRangeIn, restoreCaret: restoreCaret, getDocId: getDocId,
+    caretToBlockEnd: caretToBlockEnd,
     findSlashBlock: findSlashBlock, mergeBlockDom: mergeBlockDom,
     updateContent: updateContent, centerStyle: centerStyle, getLute: getLute,
     updateMathTag: updateMathTag, looksLossy: looksLossy, mathEditing: mathEditing,
@@ -3142,7 +3876,11 @@ SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyP
     captionMenu: captionMenu, domBlockMeta: domBlockMeta, promoteMenuItems: promoteMenuItems,
     mediaCaptionMenu: mediaCaptionMenu, mediaKindOf: mediaKindOf, menuHint: menuHint,
     inTableCell: inTableCell, neighborPara: neighborPara,
+    stripNumber: stripNumber,
     mainMenuOf: mainMenuOf, menuItemRoot: menuItemRoot,
     stripCaptionPrefix: stripCaptionPrefix, DEFAULTS: DEFAULTS,
+    tr: tr, setUiLang: setUiLang, detectUiLang: detectUiLang, UI_TEXT: UI_TEXT,
+    eqTex: eqTex, ensureMathRenderer: ensureMathRenderer, resetMathRenderer: resetMathRenderer,
+    headingText: headingText, filterPickerRows: filterPickerRows,
     ialValue: ialValue, restoreDeadInMd: restoreDeadInMd, countRestored: countRestored };
 module.exports = SiYuanXref;

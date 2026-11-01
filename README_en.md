@@ -1,4 +1,4 @@
-# Figure, Table & Equation Cross-Reference (siyuan-xref) v1.0.3
+# Figure, Table & Equation Cross-Reference (siyuan-xref) v1.0.8
 
 **Chinese**: [README.md](./README.md) ｜ Install: SiYuan → Settings → Marketplace → Plugins → search "图表公式交叉引用" or `xref`
 
@@ -38,7 +38,7 @@ Three things it does for you:
 - If the anchor text is stale at renumber time, the plugin rewrites "Figure 2" to "Figure 3" inside `((blockID "…"))`; the target block is unchanged.
 - Multiple references in one paragraph and nested references are all refreshed; references stored in other documents are never touched (this document only).
 
-### 2.3 One-click caption from the block menu (new in 1.0.3)
+### 2.3 One-click caption from the right-click menu (new in 1.0.3, complete in 1.0.6)
 
 No need to remember `custom-xref="fig"` — right-click a paragraph and use the block menu:
 
@@ -50,7 +50,9 @@ No need to remember `custom-xref="fig"` — right-click a paragraph and use the 
 
 - **Immediate**: the right-click path takes the fast route (measured 620 ms); only the text-detection path waits 1–3 s for the index.
 - **Multi-select works**: mark several paragraphs as figure (or table) captions in one go.
+- **"Insert cross-reference…" sits in the in-text right-click menu**: with the caret in a paragraph, heading or list item, right-click and the item is at the top of the menu, inserting at the **caret** — exactly what `/xref` and `Ctrl+Alt+R` do (see [6.3](#63-block-right-click-menu) / [7.5](#75-insert-a-cross-reference)). Text inside a table cell offers it too: a cell never holds a caption, while "as Table 1 shows" is precisely what you type there. **It is not in the block-icon menu** (the little handle on the left) — a reference belongs in the middle of text, so a block-level entry is redundant noise; images and tables themselves do not offer it either, since a caption should come first.
 - **No stacking**: clicking "Set as figure caption" on a paragraph that already starts with "图 3" replaces the prefix instead of producing "图 4 图 3 …".
+- **Clearing stays reliable**: clicking "Clear caption" while a renumber round is running no longer ends with a "please retry" toast — it queues until that round finishes, and the following 30 s of automatic rounds will not write the number back (fixed in 1.0.4).
 - SiYuan forces plugin menu items into the **"Plugin ›" submenu** (see [3.10](#310-plugin-menu-items-are-forced-into-a-plugin--submenu)); open "Plugin" and they are there.
 
 ### 2.4 Figures and tables: the caption goes in the right place
@@ -97,6 +99,20 @@ A figure or a table **cannot be its own caption block** — writing a number int
 - Every SQL query uses `limit -1`, so nothing is silently truncated at SiYuan's default 64 rows.
 - Automatic and manual runs are mutually exclusive (`_running`), so they never write the same block at once.
 - The global network probe is **off by default** and only installed when Diagnostic log is enabled (it costs performance).
+
+### 2.9 Bilingual interface (follows SiYuan)
+
+- There is no language switch: the plugin follows Settings → Appearance → Language. SiYuan in Chinese gives a fully Chinese plugin; SiYuan in English (or any other language) gives an English one.
+- Covered: right-click menus, every message, the settings panel (titles, descriptions, dropdown options), slash commands, command names and the cross-reference picker (including its filter buttons All / Figure / Table / Eq and the All sections dropdown).
+- Number labels follow too: with an English interface new captions default to `Figure 1` / `Table 1` / `Eq 1`; in Chinese they are 图 1 / 表 1 / 式 1. Labels you typed into settings always win and are never overridden.
+- Caption prefixes in either language are recognised: an old Chinese document opened under an English interface still numbers 图 3 correctly, and the other way round.
+
+### 2.10 Filter the picker by kind / section (new in 1.0.8)
+
+- A row of kind buttons **All / Figure / Table / Eq** at the top, each with a live count; click one to see only that kind, click it again to go back to All.
+- The dropdown next to it lists the outline indented by H1 / H2; picking a chapter restricts the list to that section **including its sub-sections**, and only headings that actually contain captions are listed.
+- Kind, section and search **stack on top of each other**: with a hundred captions, click Table, pick chapter 3, then choose from the two or three rows left.
+- Keyboard habits are unchanged: `↑↓` to select, `Enter` to insert, `Esc` to close — the buttons are mouse-only and never steal focus.
 
 ---
 
@@ -312,12 +328,16 @@ Right-click a paragraph / image / table → the top of the menu:
 
 | Target | Menu items |
 |---|---|
-| Ordinary paragraph | Set as figure caption ／ Set as table caption |
-| Paragraph that already is a caption | The two above + Clear caption |
+| Text of a paragraph / heading / list item | Set as figure caption ／ Set as table caption ／ **Insert cross-reference…** |
+| Paragraph that already is a caption | The two above + Clear caption + **Insert cross-reference…** |
 | Image | Add figure caption below ／ Turn the paragraph below into a figure caption ／ Clear caption |
 | Table | Add table caption above ／ Turn the paragraph above into a table caption ／ Clear caption |
-| Anywhere inside a table cell (including images in a cell) | **No caption menu at all**, only a grey hint |
+| **Text** inside a table cell | Only **Insert cross-reference…** (a cell never holds a caption, but references are often written inside one), inserted at the caret |
+| **Image** inside a table cell | No menu; grey hint "captions are not supported inside table cells…" |
+| Block icon (handle on the left) | Caption items only — no "Insert cross-reference" |
 | Equation block / code block | No menu; grey hint "equation blocks are numbered automatically, no caption needed" |
+
+> The three entry points are equivalent and all insert at the **caret**: in-text right-click → "Insert cross-reference…", `/xref`, and `Ctrl+Alt+R`. The only thing withheld is the **block-icon menu** — a reference is written in the middle of text, so a block-level entry is pure redundancy; images and tables themselves get caption items instead.
 
 ### 6.4 Hotkey caveats
 
@@ -365,9 +385,9 @@ Right-click a paragraph / image / table → the top of the menu:
 
 ### 7.5 Insert a cross-reference
 
-1. Put the caret where the reference should go.
-2. Type `/xref` and press Enter, or press `Ctrl+Alt+R`.
-3. Filter by number or caption keyword (e.g. type `2` or `water`).
+1. Put the caret where the reference should go, then right-click the text — "Insert cross-reference…" is at the top of the menu. **Inside a table works too**: right-click text in a cell and that is the only item offered (a cell never holds a caption). `/xref` and `Ctrl+Alt+R` open the same picker.
+2. **Narrow it first, then choose** (worth it once a document has many captions): the row of kind buttons **All / Figure / Table / Eq** at the top of the picker shows the live count for each — click one to see only that kind, click it again to go back to All. The dropdown on the right lists the document outline indented by H1 / H2; picking a chapter restricts the list to that section **including its sub-sections**, and only headings that actually contain captions are listed.
+3. Still too many? Type a number or caption keyword to filter further (e.g. `2` or `water`). **Kind, section and search stack**: click Table and pick chapter 3, and two or three rows are left. Equation rows show the **rendered formula**, not raw `$$ y=1-sin(x) \tag{2-1} $$` source — SiYuan's own MathJax / KaTeX does the rendering, with monospace source as the fallback.
 4. ↑↓ to select, Enter to insert, `Esc` to close.
 5. The result is `((blockID "Figure 2"))`, displayed as a clickable "Figure 2".
 
@@ -408,6 +428,9 @@ Right-click a paragraph / image / table → the top of the menu:
 
 - 1.0.1 → 1.0.2: the default for "Dead references" changed from "convert to text" to "leave untouched"; the plugin **migrates your setting once** if you never changed it, and burnt references can be recovered with "Restore in this document".
 - 1.0.2 → 1.0.3: adds the figure/table right-click captions and the "Text auto-detection" switch; no migration needed.
+- 1.0.5 → 1.0.6: in-text right-click can insert a cross-reference; the interface is bilingual (follows SiYuan). Existing documents are untouched, no migration needed.
+- 1.0.6 → 1.0.7: equations are rendered as formulas in the picker instead of showing LaTeX source. No migration.
+- 1.0.7 → 1.0.8: the picker gains the kind + section filters. No migration, numbering rules untouched.
 - If behaviour does not change after upgrading, toggle the plugin off and on (see [7.1](#71-install-and-enable)).
 
 ---
@@ -422,7 +445,7 @@ Listed honestly — do not expect what it cannot do.
 2. **Captions must be standalone paragraphs.** A table block cannot hold a number, and SiYuan's native image caption (the description inside an image block) does not participate in this plugin's numbering.
 3. **`\tag` only.** Any other way of writing an equation number by hand (e.g. `\qquad (1)`) is neither recognised nor maintained.
 4. **No sub-figure / sub-table numbering** (Figure 1(a), 1(b)), and no automatic list of figures or tables.
-5. **The settings panel is Chinese only.** All features work for English users, but the option labels are in Chinese — a known shortfall; i18n is planned.
+5. **Section filtering needs headings.** The dropdown lists blocks that are `h1`–`h6` only; a document without headings (single-section or pure figure sheet) hides it automatically and leaves the kind filter plus the search box.
 
 ### 8.2 Known risks and caveats
 
