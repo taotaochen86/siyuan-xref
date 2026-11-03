@@ -98,8 +98,9 @@ const bad = (m) => { fail++; console.log("  \x1b[31m✗\x1b[0m " + m); };
 
 if (!fs.existsSync("package.zip")) { bad("package.zip 未生成"); process.exit(1); }
 const list = execSync("unzip -Z1 package.zip", { encoding: "utf8" }).trim().split("\n").filter(Boolean);
-if (list.some((n) => n.includes("/"))) bad("zip 内文件套了目录（必须全在根层）: " + list.join(", "));
-else ok("zip 内文件全在根层（" + list.length + " 个）");
+const stray = list.filter((n) => n.includes("/") && !n.startsWith("assets/"));
+if (stray.length) bad("zip 内文件套了目录（必须全在根层）: " + stray.join(", "));
+else ok("zip 内主文件全在根层，assets/ 为配图目录（共 " + list.length + " 个）");
 
 if (!list.includes("plugin.json")) { bad("zip 内没有 plugin.json"); process.exit(1); }
 

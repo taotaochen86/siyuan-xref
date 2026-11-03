@@ -1,8 +1,8 @@
 {
   "name": "siyuan-xref",
-  "author": "陈涛涛 (Taotao Chen)",
+  "author": "ttChen",
   "url": "https://github.com/taotaochen86/siyuan-xref",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "minAppVersion": "3.7.0",
   "backends": [
     "all"

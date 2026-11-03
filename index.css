@@ -1,116 +1,237 @@
-/* siyuan-xref 引用选择器 —— 跟随思源主题变量，明暗自动适配 */
+/* siyuan-xref 界面样式 —— 全部走思源主题变量，浅色 / 深色自动跟随
+   作用域一律挂在 .xr-* 上，不污染思源自身的 .b3-* 组件 */
+
+/* ── 遮罩 ───────────────────────────────────────────── */
 .xr-mask {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.22);
   display: flex;
   align-items: flex-start;
   justify-content: center;
 }
 
+/* ── 面板 ───────────────────────────────────────────── */
 .xr-panel {
-  margin-top: 12vh;
-  width: 520px;
-  max-width: 88vw;
-  max-height: 64vh;
+  margin-top: 11vh;
+  width: 600px;
+  max-width: 92vw;
+  max-height: 66vh;
   display: flex;
   flex-direction: column;
   background: var(--b3-theme-background, #fff);
   color: var(--b3-theme-on-background, #202124);
   border: 1px solid var(--b3-border-color, #e0e0e0);
-  border-radius: var(--b3-border-radius-b, 8px);
-  box-shadow: var(--b3-dialog-shadow, 0 8px 32px rgba(0, 0, 0, 0.18));
+  border-radius: var(--b3-border-radius-b, 6px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
-.xr-title {
-  padding: 10px 14px 6px;
-  font-size: 13px;
+/* ── 头部 ───────────────────────────────────────────── */
+.xr-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--b3-border-color, #e0e0e0);
+}
+
+.xr-ico {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--b3-theme-primary, #3575f0);
+  display: flex;
+  align-items: center;
+}
+
+.xr-ico svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.xr-headtx {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.xr-headtx b {
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.4;
+  color: var(--b3-theme-on-background, #202124);
+}
+
+.xr-sub {
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--b3-theme-on-surface, #5f6368);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 搜索框 ─────────────────────────────────────────── */
+.xr-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 16px 0;
+  padding: 0 10px;
+  height: 34px;
+  border: 1px solid var(--b3-border-color, #e0e0e0);
+  border-radius: var(--b3-border-radius, 4px);
+  background: var(--b3-theme-surface, #f5f6f7);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.xr-search:focus-within {
+  border-color: var(--b3-theme-primary, #3575f0);
+  background: var(--b3-theme-background, #fff);
+  box-shadow: 0 0 0 2px var(--b3-theme-primary-lightest, rgba(53, 117, 240, 0.12));
+}
+
+.xr-search > span {
+  display: flex;
+  align-items: center;
+}
+
+.xr-search svg {
+  display: block;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: var(--b3-theme-on-surface, #8b909a);
 }
 
 .xr-input {
-  margin: 0 14px 8px;
-  width: calc(100% - 28px);
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--b3-theme-on-background, #202124);
 }
 
+.xr-input::placeholder {
+  color: var(--b3-theme-on-surface, #9aa0a6);
+}
+
+/* ── 筛选条 ─────────────────────────────────────────── */
 .xr-tools {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px 8px;
+  padding: 10px 16px;
   flex-wrap: wrap;
 }
 
 .xr-chips {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 
 .xr-chip {
-  padding: 2px 9px;
-  border-radius: 11px;
+  padding: 3px 11px;
+  border-radius: var(--b3-border-radius, 4px);
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
   color: var(--b3-theme-on-surface, #5f6368);
-  background: var(--b3-theme-surface, #f2f3f5);
+  background: var(--b3-theme-surface, #f5f6f7);
   border: 1px solid transparent;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 
 .xr-chip:hover {
-  border-color: var(--b3-border-color, #e0e0e0);
+  background: var(--b3-theme-surface-lighter, #eceef1);
+  color: var(--b3-theme-on-background, #202124);
 }
 
 .xr-chip.xr-chip-on {
   font-weight: 600;
-  color: var(--b3-theme-primary, #3573f0);
-  background: var(--b3-theme-primary-lightest, rgba(53, 115, 240, 0.12));
-  border-color: var(--b3-theme-primary-light, rgba(53, 115, 240, 0.35));
+  color: var(--b3-theme-primary, #3575f0);
+  background: var(--b3-theme-primary-lightest, rgba(53, 117, 240, 0.10));
+  border-color: var(--b3-theme-primary-light, rgba(53, 117, 240, 0.35));
 }
 
-.xr-sec {
-  flex: 1 1 120px;
+.xr-panel .xr-sec {
+  flex: 1 1 130px;
   min-width: 0;
   height: 26px;
   font-size: 12px;
+  padding: 0 4px;
 }
 
+/* ── 列表 ───────────────────────────────────────────── */
 .xr-list {
   overflow-y: auto;
-  min-height: 0;   /* flex 容器里的滚动区，不给 0 会顶出面板 */
-  padding-bottom: 6px;
+  min-height: 0;          /* flex 容器里的滚动区，不给 0 会顶出面板 */
+  padding: 2px 0 6px;
+  border-top: 1px solid var(--b3-border-color, #e0e0e0);
+  margin-top: 0;
 }
 
 .xr-item {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 7px 14px;
+  padding: 8px 16px 8px 18px;
   cursor: pointer;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
-.xr-item:hover,
+/* 选中态的左侧竖条：比整块变色轻，眼睛不跳 */
+.xr-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.12s;
+}
+
+.xr-item:hover {
+  background: var(--b3-list-hover, rgba(0, 0, 0, 0.035));
+}
+
 .xr-cur.xr-item {
-  background: var(--b3-theme-surface, #f2f3f5);
+  background: var(--b3-theme-primary-lightest, rgba(53, 117, 240, 0.10));
 }
 
+.xr-cur.xr-item::before {
+  background: var(--b3-theme-primary, #3575f0);
+}
+
+/* 编号做成小胶囊，和右侧题注拉开层次 */
 .xr-name {
   flex: 0 0 auto;
   font-weight: 600;
-  color: var(--b3-theme-primary, #3573f0);
+  font-size: 12.5px;
+  color: var(--b3-theme-primary, #3575f0);
+  background: var(--b3-theme-primary-lightest, rgba(53, 117, 240, 0.09));
+  border-radius: 3px;
+  padding: 1px 7px;
   white-space: nowrap;
 }
 
 .xr-preview {
   flex: 1 1 auto;
+  min-width: 0;
   color: var(--b3-theme-on-surface, #5f6368);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -118,12 +239,50 @@
 }
 
 .xr-empty {
-  padding: 16px 14px;
+  padding: 26px 16px;
+  text-align: center;
   font-size: 13px;
   color: var(--b3-theme-on-surface, #5f6368);
 }
 
-/* 公式行：预览里直接渲染成公式，别再显示 $$ y=1-sin(x) \tag{2-1} $$ 这种源码 */
+/* ── 底部快捷键提示 ─────────────────────────────────── */
+.xr-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--b3-border-color, #e0e0e0);
+  background: var(--b3-theme-surface, #f5f6f7);
+  font-size: 11.5px;
+  color: var(--b3-theme-on-surface, #5f6368);
+}
+
+.xr-foot span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.xr-foot .xr-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--b3-theme-on-surface, #8b909a);
+}
+
+.xr-foot kbd {
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 15px;
+  padding: 0 5px;
+  border-radius: 3px;
+  border: 1px solid var(--b3-border-color, #d9dce1);
+  background: var(--b3-theme-background, #fff);
+  color: var(--b3-theme-on-surface, #5f6368);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* ── 公式行 ─────────────────────────────────────────── */
 .xr-preview .xr-math {
   display: inline-block;
   max-width: 100%;
@@ -147,11 +306,64 @@
   font-size: 0.92em;
 }
 
-/* 指向已删块的引用：标红 + 删除线，一眼能看出失效 */
+/* ── 失效引用：标红 + 删除线，一眼能看出死链 ────────── */
 .protyle-wysiwyg span[data-type="block-ref"].xref-dead,
 .protyle-wysiwyg span[data-type="block-ref"].xref-dead * {
   color: var(--b3-theme-error, #d23f31) !important;
   text-decoration: line-through !important;
   text-decoration-thickness: 1px;
   cursor: help;
+}
+
+/* ── 设置面板（只在拿到 Setting 容器并挂上 .xr-setting 时生效） ──
+   思源把插件设置渲染在共用容器里，没有专属 class 可挂；
+   插件启动时若能拿到 this.setting.element，就补一个 .xr-setting，
+   拿不到（API 改名等）则整段样式不生效，面板退回思源原生样子。 */
+.xr-setting .b3-label {
+  padding: 13px 0;
+  border-bottom: 1px solid var(--b3-border-color, #e0e0e0);
+}
+
+.xr-setting .b3-label:last-child {
+  border-bottom: 0;
+}
+
+.xr-setting .b3-label__text {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--b3-theme-on-background, #202124);
+}
+
+.xr-setting .b3-label__desc {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--b3-theme-on-surface, #5f6368);
+}
+
+.xr-setting .b3-label .fn__flex {
+  gap: 18px;
+}
+
+.xr-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 22px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--b3-theme-on-surface, #5f6368);
+}
+
+.xr-group:first-child {
+  margin-top: 2px;
+}
+
+.xr-group::before {
+  content: "";
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--b3-theme-primary, #3575f0);
 }

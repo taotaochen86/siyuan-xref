@@ -14,6 +14,9 @@ Three things it does for you:
 2. You write "see Figure 2" in the body; the plugin keeps it as a **live reference bound to a block ID**, so when Figure 2 becomes Figure 3 the reference changes by itself.
 3. When you delete, edit or undo something, the numbering is re-flowed as a whole and the references are refreshed — you do not have to remember where you referenced anything.
 
+<img src="assets/numbering-follows.png" alt="After inserting a new figure, numbering is re-flowed and the in-text references follow" onerror="this.src='/plugins/siyuan-xref/assets/numbering-follows.png'">
+
+
 ---
 
 ## 2 Main features
@@ -38,6 +41,9 @@ Three things it does for you:
 - If the anchor text is stale at renumber time, the plugin rewrites "Figure 2" to "Figure 3" inside `((blockID "…"))`; the target block is unchanged.
 - Multiple references in one paragraph and nested references are all refreshed; references stored in other documents are never touched (this document only).
 
+<img src="assets/xref-panel.png" alt="Picker with type / section / keyword filters; equations are shown rendered" onerror="this.src='/plugins/siyuan-xref/assets/xref-panel.png'">
+
+
 ### 2.3 One-click caption from the right-click menu (new in 1.0.3, complete in 1.0.6)
 
 No need to remember `custom-xref="fig"` — right-click a paragraph and use the block menu:
@@ -54,6 +60,9 @@ No need to remember `custom-xref="fig"` — right-click a paragraph and use the 
 - **No stacking**: clicking "Set as figure caption" on a paragraph that already starts with "图 3" replaces the prefix instead of producing "图 4 图 3 …".
 - **Clearing stays reliable**: clicking "Clear caption" while a renumber round is running no longer ends with a "please retry" toast — it queues until that round finishes, and the following 30 s of automatic rounds will not write the number back (fixed in 1.0.4).
 - SiYuan forces plugin menu items into the **"Plugin ›" submenu** (see [3.10](#310-plugin-menu-items-are-forced-into-a-plugin--submenu)); open "Plugin" and they are there.
+
+<img src="assets/context-menu.png" alt="One right-click adds a caption in the right place: figure below, table above" onerror="this.src='/plugins/siyuan-xref/assets/context-menu.png'">
+
 
 ### 2.4 Figures and tables: the caption goes in the right place
 
@@ -546,4 +555,4 @@ The marketplace only consumes `package.zip` from the GitHub **Latest Release**. 
 
 ## 11 License
 
-MIT
+MIT License © 2026 ttChen

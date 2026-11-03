@@ -21,6 +21,8 @@ while IFS= read -r f; do
 done < <(node -e "const r=require('./plugin.json').readme||{};console.log([...new Set(Object.values(r))].join('\n'))")
 
 [ -f preview.png ] && FILES+=(preview.png)
+# README 里引用的配图目录
+[ -d assets ] && FILES+=(assets)
 [ -d i18n ] && FILES+=(i18n)
 
 for f in "${FILES[@]}"; do

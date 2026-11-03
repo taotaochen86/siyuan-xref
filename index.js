@@ -43,46 +43,47 @@ const UI_TEXT = {
         "hint.math": "图表题注：公式块会自动编号，不用设题注",
         "hint.default": "图表题注：请右键图片/表格本身，或图下方（表上方）的题注段落",
 
-        // 设置面板
+        // 设置面板：分组标题（装饰用，拿不到容器就不显示）
+        "set.grp.num": "编号",
+        "set.grp.trigger": "触发与引用",
+        "set.grp.look": "题注外观",
+        "set.grp.keys": "快捷键",
+        "set.grp.adv": "高级",
+
+        // 设置面板：描述一律压到一到两行 —— 右侧被控件占着，长句会被压出遮挡
         "set.mode.title": "编号模式",
-        "set.mode.desc": "全文连续（图 1、图 2）或按一级标题分章（图 1-1、图 2-1）",
+        "set.mode.desc": "全文连续（图 1、图 2）或按标题分章（图 1-1、图 2-1）",
         "set.mode.continuous": "全文连续", "set.mode.chapter": "按章编号",
         "set.labels.title": "图 / 表 / 式 标签",
-        "set.labels.desc": "题注前缀文字，例如填 Figure / Table / Eq",
+        "set.labels.desc": "题注前缀文字，可填 Figure / Table / Eq",
         "set.refs.title": "重排时同步刷新引用",
-        "set.refs.desc": "把 ((块ID \"旧锚文本\")) 全部改成新编号。关闭后只改编号不动引用",
+        "set.refs.desc": "同时改写 ((块ID \"旧锚文本\"))；关闭后只动编号",
         "set.auto.title": "自动重排",
-        "set.auto.desc": "写完题注停手 1.5 秒后自动重排编号并刷新引用。不会写入光标所在的块，避免打断输入",
+        "set.auto.desc": "停手 1.5 秒后自动重排；不写入光标所在的块",
         "set.detect.title": "文字自动识别",
-        "set.detect.desc": "正文以「图 3 ……」「表 2 ……」开头的段落自动当作题注参与编号。关掉后只认" +
-            "右键菜单设的题注（custom-xref 属性）——正文里顺口写到「图 3 中可以看出」这种普通段落" +
-            "就不会被误编号。自动识别本来就要等索引进位，慢一点没关系；右键设的题注不受此开关影响，点了立刻生效",
+        "set.detect.desc": "正文以「图 3」「表 2」开头的段落自动当题注；关掉后只认右键设的",
         "set.dead.title": "失效引用怎么处理",
-        "set.dead.desc": "指向已删块、或指向「已取消题注」的块的引用。默认「不处理」：引用原样留着，删块后按 Ctrl+Alt+Z 能把块重建回来、" +
-            "引用自动接回；「仅标红」会在正文里涂红加删除线（看着像内容被改坏）；" +
-            "「转成文本」会让引用彻底失效、无法还原，还会等 10 秒才动手",
+        "set.dead.desc": "指向已删块的引用怎么处理。默认不动手，按 Ctrl+Alt+Z 重建块后自动接回",
         "set.dead.off": "不处理，保持原样（推荐）",
         "set.dead.mark": "仅标红，保留引用",
         "set.dead.text": "转成红色删除线文本（不可逆）",
         "set.center.title": "题注居中",
-        "set.center.desc": "重排时把「图 N …」「表 N …」题注段落设为居中",
+        "set.center.desc": "把「图 N …」「表 N …」题注段落设为居中",
         "set.bg.title": "题注底色",
-        "set.bg.desc": "给「图 N …」「表 N …」题注加一层很淡的底色，暗色主题下也看得清；自己设过底色的不会被改",
+        "set.bg.desc": "给题注加一层淡底色，暗色主题下也看得清；自己设过的不改",
         "set.bg.none": "无底色", "set.bg.faint": "极浅", "set.bg.light": "浅（默认）", "set.bg.blue": "浅蓝",
         "set.keys.title": "自定义快捷键",
-        "set.keys.desc": "点一下输入框，再按下想用的组合键（必须带 Ctrl / Alt / ⌘）。Backspace 清空，Esc 取消。" +
-            "同时也会出现在「设置 → 快捷键 → 插件」里，两处改都行",
+        "set.keys.desc": "点输入框后直接按组合键（须带 Ctrl / Alt / ⌘）；Backspace 清空",
         "set.keys.insert": "插入交叉引用", "set.keys.renumber": "重排编号",
         "set.keys.undo": "撤销上次重排", "set.keys.redo": "重做",
         "set.keys.unset": "未设置", "set.keys.press": "请按组合键…", "set.keys.tip": "点击后按下组合键",
         "set.undo.title": "撤销步数",
-        "set.undo.desc": "插件自己记多少轮重排可以撤回（1~50）。思源的 Ctrl+Z 撤不到插件写入，所以单独记一份",
+        "set.undo.desc": "插件自带的撤销栈保留几轮（1~50）；思源 Ctrl+Z 撤不到插件写入",
         "set.restore.title": "还原失效引用",
-        "set.restore.desc": "把以前被「转成文本」烧掉的引用改回 ((块ID \"锚\"))。目标块已删除的会自动跳过",
+        "set.restore.desc": "把被「转成文本」烧掉的引用改回 ((块ID \"锚\"))，块已删的跳过",
         "set.restore.btn": "还原当前文档", "set.restore.busy": "还原中…",
         "set.debug.title": "诊断日志（排查用）",
-        "set.debug.desc": "开启后会拦截全局网络请求并写 ws-log.json / err-log.json。" +
-            "**只在排查问题时开，平时请关闭**，会拖慢思源",
+        "set.debug.desc": "只在排查问题时开，长期开会拖慢思源",
 
         // 提示消息
         "msg.loadErr": "siyuan-xref 加载异常：{0}（详见 data/storage/petal/siyuan-xref/err-log.json）",
@@ -161,46 +162,45 @@ const UI_TEXT = {
         "hint.math": "Captions: equation blocks are numbered automatically, no caption needed",
         "hint.default": "Captions: right-click the image / table itself, or the caption paragraph below a figure (above a table)",
 
+        "set.grp.num": "Numbering",
+        "set.grp.trigger": "Trigger & references",
+        "set.grp.look": "Caption look",
+        "set.grp.keys": "Hotkeys",
+        "set.grp.adv": "Advanced",
+
         "set.mode.title": "Numbering mode",
-        "set.mode.desc": "Continuous through the whole document (Figure 1, Figure 2) or restart at every top-level heading (Figure 1-1, Figure 2-1)",
+        "set.mode.desc": "Continuous through the document (Figure 1, 2) or restart at every heading (Figure 1-1)",
         "set.mode.continuous": "Continuous", "set.mode.chapter": "Per chapter",
         "set.labels.title": "Figure / table / equation labels",
         "set.labels.desc": "Text written in front of each number, e.g. Figure / Table / Eq",
         "set.refs.title": "Refresh references when renumbering",
-        "set.refs.desc": "Rewrites every ((block id \"old anchor\")) to the new number. Turn it off to change numbers only and leave references alone.",
+        "set.refs.desc": "Also rewrites ((block id \"old anchor\")); off = change numbers only",
         "set.auto.title": "Auto renumber",
-        "set.auto.desc": "Renumbers and refreshes references 1.5 s after you stop typing. It never writes into the block holding the caret, so typing is not interrupted.",
+        "set.auto.desc": "Renumbers 1.5 s after you stop typing; never writes into the block holding the caret",
         "set.detect.title": "Detect captions from text",
-        "set.detect.desc": "A paragraph that starts with 图 3 / Figure 3 / 表 2 / Table 2 counts as a caption. " +
-            "Turn it off to accept only captions set from the right-click menu (the custom-xref attribute), so an ordinary " +
-            "sentence such as \"as Figure 3 shows\" is never renumbered. Detection has to wait for the index to catch up, which is fine; " +
-            "captions set from the menu are not affected and take effect immediately.",
+        "set.detect.desc": "A paragraph starting with Figure 3 / 图 3 / Table 2 counts as a caption; off = only right-click captions",
         "set.dead.title": "Broken references",
-        "set.dead.desc": "A reference pointing to a deleted block, or to a block whose caption was cleared. Default \"leave alone\": the reference " +
-            "stays as it is, and Ctrl+Alt+Z rebuilds the deleted block with its original ID so the reference reconnects. \"Mark red\" paints it red " +
-            "with a strikethrough, which is easy to mistake for content damage. \"Convert to text\" is irreversible and waits 10 s before acting.",
+        "set.dead.desc": "References to deleted blocks. Default is to leave them alone — Ctrl+Alt+Z rebuilds the block and reconnects them",
         "set.dead.off": "Leave alone (recommended)",
         "set.dead.mark": "Mark red, keep the reference",
         "set.dead.text": "Convert to red strikethrough text (irreversible)",
         "set.center.title": "Centre captions",
         "set.center.desc": "Centres every figure / table caption paragraph while renumbering",
         "set.bg.title": "Caption tint",
-        "set.bg.desc": "Adds a very light tint behind caption paragraphs; still readable in dark themes. Captions you tinted yourself are left alone.",
+        "set.bg.desc": "A light tint behind caption paragraphs; captions you tinted yourself are left alone",
         "set.bg.none": "None", "set.bg.faint": "Very faint", "set.bg.light": "Light (default)", "set.bg.blue": "Pale blue",
         "set.keys.title": "Custom hotkeys",
-        "set.keys.desc": "Click a field, then press the combination you want (Ctrl / Alt / ⌘ required). Backspace clears it, Esc cancels. " +
-            "The same keys also appear under Settings → Keymap → Plugins; either place works.",
+        "set.keys.desc": "Click a field and press the combination (Ctrl / Alt / ⌘ required); Backspace clears it",
         "set.keys.insert": "Insert reference", "set.keys.renumber": "Renumber",
         "set.keys.undo": "Undo renumber", "set.keys.redo": "Redo",
         "set.keys.unset": "not set", "set.keys.press": "press keys…", "set.keys.tip": "Click, then press the keys",
         "set.undo.title": "Undo depth",
-        "set.undo.desc": "How many renumber runs stay undoable (1–50). SiYuan's own Ctrl+Z cannot undo API writes, so the plugin keeps its own stack.",
+        "set.undo.desc": "How many renumber runs stay undoable (1-50); SiYuan Ctrl+Z cannot undo API writes",
         "set.restore.title": "Restore broken references",
-        "set.restore.desc": "Turns references that were previously burned into plain text back into ((block id \"anchor\")). Blocks whose target no longer exists are skipped.",
+        "set.restore.desc": "Turns references burned into plain text back into ((block id \"anchor\")); missing targets are skipped",
         "set.restore.btn": "Restore this document", "set.restore.busy": "Restoring…",
         "set.debug.title": "Diagnostic log (troubleshooting)",
-        "set.debug.desc": "Intercepts every network request and writes ws-log.json / err-log.json. " +
-            "Turn it on only while troubleshooting — it slows SiYuan down.",
+        "set.debug.desc": "Only while troubleshooting — it slows SiYuan down",
 
         "msg.loadErr": "siyuan-xref failed to load: {0} (see data/storage/petal/siyuan-xref/err-log.json)",
         "msg.error": "siyuan-xref error: {0}",
@@ -2548,14 +2548,18 @@ class SiYuanXref extends Plugin {
             title: tr("set.labels.title"),
             description: tr("set.labels.desc"),
             createActionElement: () => {
+                // 三个标签并排：思源的 .b3-text-field 是块级元素，不给 flex 会竖着堆成一列
                 const box = document.createElement("div");
+                box.style.display = "flex";
+                box.style.gap = "6px";
                 [["figLabel", tr("label.fig")], ["tabLabel", tr("label.tab")],
                     ["eqLabel", tr("label.eq")]].forEach(([k, ph]) => {
                     const inp = document.createElement("input");
-                    inp.className = "b3-text-field fn__size80";
+                    inp.className = "b3-text-field";
                     inp.placeholder = ph;
                     inp.value = this.settings[k];
-                    inp.style.marginRight = "4px";
+                    inp.style.width = "62px";
+                    inp.style.textAlign = "center";
                     inp.addEventListener("change", () => { this.settings[k] = inp.value.trim() || ph; this.saveSettings(); });
                     box.appendChild(inp);
                 });
@@ -2694,6 +2698,7 @@ class SiYuanXref extends Plugin {
                     const tip = document.createElement("span");
                     tip.textContent = label;
                     tip.style.fontSize = "12px";
+                    tip.style.width = "86px";
                     tip.style.opacity = "0.72";
                     tip.style.whiteSpace = "nowrap";
                     tip.style.flex = "0 0 auto";
@@ -2743,7 +2748,8 @@ class SiYuanXref extends Plugin {
             description: tr("set.undo.desc"),
             createActionElement: () => {
                 const inp = document.createElement("input");
-                inp.className = "b3-text-field fn__size200";
+                inp.className = "b3-text-field";
+                inp.style.width = "90px";
                 inp.type = "number";
                 inp.min = "1";
                 inp.max = "50";
@@ -2798,6 +2804,8 @@ class SiYuanXref extends Plugin {
                 return inp;
             },
         });
+
+        this.watchSettingPanel();
 
         this.bindHotkeys();
         this.bindBlockMenu();
@@ -2932,6 +2940,53 @@ class SiYuanXref extends Plugin {
     /* ==================== 块右键菜单：设为图/表题注 ==================== */
 
     /** 只注册一次；菜单项按当前选中的块动态生成 */
+    /**
+     * 设置面板装饰：加分组标题 + 专属 class。
+     * Setting 实例不暴露容器（3.8.9 实测 this.setting.element 是 undefined），改成等 #settings 出现再处理；
+     * 只动「文案里含本插件设置项」的那一个面板，别的插件设置面板不会被碰。
+     */
+    watchSettingPanel() {
+        if (this._settingWatch) return;
+        this._settingWatch = true;
+        let last = 0;
+        const deco = () => {
+            const now = Date.now();
+            if (now - last < 400) return;      // 打字时 DOM 变化很频繁，节流一下
+            last = now;
+            // 思源把「所有插件的设置页」都渲染在同一个配置对话框里，只是用 fn__none 藏起来，
+            // 所以不能拿 .b3-dialog__body 当容器（会插到别的插件设置里）。
+            // 做法：先找到本插件的第一项（编号模式），再往上找它所属的那一页。
+            const all = document.querySelectorAll(".b3-label");
+            let mine = null;
+            for (const l of all) {
+                if ((l.textContent || "").indexOf(tr("set.mode.title")) >= 0) { mine = l; break; }
+            }
+            if (!mine) return;
+            const box = mine.closest(".config__tab-container") || mine.closest(".b3-dialog__body");
+            if (!box || box.dataset.xrDeco === "1") return;
+            const rows = box.querySelectorAll(".b3-label");
+            // 本插件是 12 项。数量对不上说明容器抓错了 —— 宁可不装饰，也不能动别人的设置项
+            if (rows.length < 10 || rows.length > 18) return;
+            box.dataset.xrDeco = "1";
+            box.classList.add("xr-setting");
+            // 边界按 addItem 的顺序：编号 0-1 / 触发与引用 2-5 / 题注外观 6-7 / 快捷键 8 / 高级 9-11
+            const cuts = [[0, tr("set.grp.num")], [2, tr("set.grp.trigger")],
+                          [6, tr("set.grp.look")], [8, tr("set.grp.keys")],
+                          [9, tr("set.grp.adv")]];
+            cuts.slice().reverse().forEach((c) => {   // 倒序插入，前面插入不会打乱后面 row 的引用
+                const row = rows[c[0]];
+                if (!row) return;
+                const h = document.createElement("div");
+                h.className = "xr-group";
+                h.textContent = c[1];
+                row.parentNode.insertBefore(h, row);
+            });
+        };
+        const mo = new MutationObserver(deco);
+        mo.observe(document.body, { childList: true, subtree: true });
+        this._settingObserver = mo;
+    }
+
     bindBlockMenu() {
         if (this._blockMenuOn) return;
         this._blockMenuOn = true;
@@ -4222,12 +4277,39 @@ class SiYuanXref extends Plugin {
         mask.className = "xr-mask";
         const panel = document.createElement("div");
         panel.className = "xr-panel";
-        const title = document.createElement("div");
-        title.className = "xr-title";
-        title.textContent = tr("picker.title");
+
+        // 头部：图标 + 标题 + 当前筛选与条数。和思源 Dialog 的标题栏同一套观感（细边框、6px 圆角）
+        const head = document.createElement("div");
+        head.className = "xr-head";
+        const headIco = document.createElement("div");
+        headIco.className = "xr-ico";
+        headIco.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M10.2 13.6a4.6 4.6 0 0 0 6.5 0l3-3a4.6 4.6 0 0 0-6.5-6.5l-1.6 1.6"/>' +
+            '<path d="M13.8 10.4a4.6 4.6 0 0 0-6.5 0l-3 3a4.6 4.6 0 0 0 6.5 6.5l1.6-1.6"/></svg>';
+        const headTx = document.createElement("div");
+        headTx.className = "xr-headtx";
+        const headTitle = document.createElement("b");
+        headTitle.textContent = tr("picker.title");
+        const headSub = document.createElement("span");
+        headSub.className = "xr-sub";
+        headTx.appendChild(headTitle);
+        headTx.appendChild(headSub);
+        head.appendChild(headIco);
+        head.appendChild(headTx);
+
+        // 搜索框：图标 + 无边框输入，聚焦时整条描边亮起来（跟思源输入框的习惯一致）
+        const search = document.createElement("div");
+        search.className = "xr-search";
+        const searchIco = document.createElement("span");
+        searchIco.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/>' +
+            '<path d="M20 20l-3.6-3.6"/></svg>';
         const input = document.createElement("input");
-        input.className = "b3-text-field xr-input";
+        input.className = "xr-input";
         input.placeholder = tr("picker.ph");
+        search.appendChild(searchIco);
+        search.appendChild(input);
         // 筛选条：左边是类型（全部 / 图 / 表 / 式），右边是「只看某一节」的章节下拉。
         // 图表公式几十上百条时，光靠打字搜编号太慢（用户 2026-11-01 提）。
         const tools = document.createElement("div");
@@ -4241,10 +4323,19 @@ class SiYuanXref extends Plugin {
         tools.appendChild(secSel);
         const list = document.createElement("div");
         list.className = "xr-list";
-        panel.appendChild(title);
+        // 底栏只放键位符号 + 条数，不做翻译，10 种语言下都不会串
+        const foot = document.createElement("div");
+        foot.className = "xr-foot";
+        foot.innerHTML = "<span><kbd>↑</kbd><kbd>↓</kbd></span>" +
+            "<span><kbd>Enter</kbd></span><span><kbd>Esc</kbd></span>";
+        const footCount = document.createElement("span");
+        footCount.className = "xr-count";
+        foot.appendChild(footCount);
+        panel.appendChild(head);
+        panel.appendChild(search);
         panel.appendChild(tools);
-        panel.appendChild(input);
         panel.appendChild(list);
+        panel.appendChild(foot);
         mask.appendChild(panel);
         document.body.appendChild(mask);
         input.focus();
@@ -4261,7 +4352,10 @@ class SiYuanXref extends Plugin {
                 return html ? '<span class="xr-math">' + html + "</span>"
                     : '<span class="xr-tex">' + esc(tex.slice(0, 60)) + "</span>";
             }
-            return esc(String(x.oldMd || "").replace(/\n/g, " ").slice(0, 50));
+            // 题注原文开头就是编号（「图 1-1 …」），左边胶囊已经显示过了，这里切掉，避免一行两个「图 1-1」
+            let txt = String(x.oldMd || "").replace(/\n/g, " ").trim();
+            if (x.name && txt.indexOf(x.name) === 0) txt = txt.slice(x.name.length).trim();
+            return esc(txt.slice(0, 60)) || "—";
         };
         // ── 筛选：类型（图/表/式） + 所属标题 ────────────────────────────
         let typeFilter = "";   // "" 全部 | fig | tab | eq
@@ -4414,6 +4508,11 @@ class SiYuanXref extends Plugin {
             cur = 0;
             paintChips();
             render();
+            // 头部副标题 + 底栏计数：筛选条件一变就跟着走，一眼知道「现在是哪一类、多少条」
+            const label = typeFilter ? tr("label." + typeFilter) : tr("picker.all");
+            const secNow = secSel.selectedOptions && secSel.selectedOptions[0];
+            headSub.textContent = (secFilter && secNow) ? label + " · " + secNow.textContent.trim() : label;
+            footCount.textContent = String(items.length);
         };
         input.addEventListener("input", refresh);
         mask.addEventListener("mousedown", (ev) => { if (ev.target === mask) close(); });
