@@ -14,7 +14,7 @@ Three things it does for you:
 2. You write "see Figure 2" in the body; the plugin keeps it as a **live reference bound to a block ID**, so when Figure 2 becomes Figure 3 the reference changes by itself.
 3. When you delete, edit or undo something, the numbering is re-flowed as a whole and the references are refreshed — you do not have to remember where you referenced anything.
 
-<img src="assets/numbering-follows.png" alt="After inserting a new figure, numbering is re-flowed and the in-text references follow" onerror="this.src='/plugins/siyuan-xref/assets/numbering-follows.png'">
+<img src="https://cdn.jsdelivr.net/gh/taotaochen86/siyuan-xref@main/assets/numbering-follows.png" alt="After inserting a new figure, numbering is re-flowed and the in-text references follow" onerror="this.onerror=null;this.src='/plugins/siyuan-xref/assets/numbering-follows.png'">
 
 
 ---
@@ -41,7 +41,7 @@ Three things it does for you:
 - If the anchor text is stale at renumber time, the plugin rewrites "Figure 2" to "Figure 3" inside `((blockID "…"))`; the target block is unchanged.
 - Multiple references in one paragraph and nested references are all refreshed; references stored in other documents are never touched (this document only).
 
-<img src="assets/xref-panel.png" alt="Picker with type / section / keyword filters; equations are shown rendered" onerror="this.src='/plugins/siyuan-xref/assets/xref-panel.png'">
+<img src="https://cdn.jsdelivr.net/gh/taotaochen86/siyuan-xref@main/assets/xref-panel.png" alt="Picker with type / section / keyword filters; equations are shown rendered" onerror="this.onerror=null;this.src='/plugins/siyuan-xref/assets/xref-panel.png'">
 
 
 ### 2.3 One-click caption from the right-click menu (new in 1.0.3, complete in 1.0.6)
@@ -61,7 +61,7 @@ No need to remember `custom-xref="fig"` — right-click a paragraph and use the 
 - **Clearing stays reliable**: clicking "Clear caption" while a renumber round is running no longer ends with a "please retry" toast — it queues until that round finishes, and the following 30 s of automatic rounds will not write the number back (fixed in 1.0.4).
 - SiYuan forces plugin menu items into the **"Plugin ›" submenu** (see [3.10](#310-plugin-menu-items-are-forced-into-a-plugin--submenu)); open "Plugin" and they are there.
 
-<img src="assets/context-menu.png" alt="One right-click adds a caption in the right place: figure below, table above" onerror="this.src='/plugins/siyuan-xref/assets/context-menu.png'">
+<img src="https://cdn.jsdelivr.net/gh/taotaochen86/siyuan-xref@main/assets/context-menu.png" alt="One right-click adds a caption in the right place: figure below, table above" onerror="this.onerror=null;this.src='/plugins/siyuan-xref/assets/context-menu.png'">
 
 
 ### 2.4 Figures and tables: the caption goes in the right place
@@ -444,6 +444,7 @@ Right-click a paragraph / image / table → the top of the menu:
 - 1.0.7 → 1.0.8: the picker gains the kind + section filters. No migration, numbering rules untouched.
 - 1.0.8 → 1.0.9: the interface grows from two languages to **10** (Traditional Chinese, Japanese, Korean, German, French, Spanish, Russian and Brazilian Portuguese added); caption prefix detection is extended to the same 10 languages, so switching languages never doubles the numbering. No migration, the numbering algorithm is untouched.
 - 1.0.9 → 1.0.10: the marketplace card summary is shortened to under 100 characters only. Features, numbering rules and menus are unchanged.
+- 1.0.10 → 1.0.11: the picker and the settings panel are redesigned (light/dark, both following the SiYuan theme) and the settings are folded into 5 groups; the marketplace page gains a hero image and three illustrative screenshots. **Numbering rules, reference format and document data are untouched**, no migration needed.
 - If behaviour does not change after upgrading, toggle the plugin off and on (see [7.1](#71-install-and-enable)).
 
 ---

@@ -14,7 +14,7 @@
 2. 你在正文写「见 图 2」，插件记住这是一个**指向块 ID 的活引用**，图 2 变成图 3 时引用自己跟着变；
 3. 你删了、改了、撤销了，编号整体重排，引用同步刷新——不需要你记得改过哪些地方。
 
-<img src="assets/numbering-follows.png" alt="插入新图后，编号重排、正文引用自动跟着变" onerror="this.src='/plugins/siyuan-xref/assets/numbering-follows.png'">
+<img src="https://cdn.jsdelivr.net/gh/taotaochen86/siyuan-xref@main/assets/numbering-follows.png" alt="插入新图后，编号重排、正文引用自动跟着变" onerror="this.onerror=null;this.src='/plugins/siyuan-xref/assets/numbering-follows.png'">
 
 
 ---
@@ -41,7 +41,7 @@
 - 重排时如果锚文本里的编号过期，插件把 `((块ID "图 2"))` 里的「图 2」改成「图 3」，目标块不变。
 - 同一段里有多条引用、有多层嵌套，都能一并刷新；别的文档里的引用不会被动到（只处理本文档）。
 
-<img src="assets/xref-panel.png" alt="引用面板：按类型、章节、关键词三重筛选，公式直接显示渲染结果" onerror="this.src='/plugins/siyuan-xref/assets/xref-panel.png'">
+<img src="https://cdn.jsdelivr.net/gh/taotaochen86/siyuan-xref@main/assets/xref-panel.png" alt="引用面板：按类型、章节、关键词三重筛选，公式直接显示渲染结果" onerror="this.onerror=null;this.src='/plugins/siyuan-xref/assets/xref-panel.png'">
 
 
 ### 2.3 右键一键设 / 取消题注（1.0.3 新增，1.0.6 补齐入口）
@@ -61,7 +61,7 @@
 - **取消要说得清**：正在自动重排时点「取消」，不再弹一句「请稍候再试」就结束，而是排队等这一轮收工后照做；取消后 30 秒内自动轮也不会把编号写回来（1.0.4 修复）。
 - 菜单被思源强制放在 **「插件 ›」子菜单**里（原因见 [3.10](#310-插件菜单被强制塞进插件--子菜单)），点开「插件」就能看到。
 
-<img src="assets/context-menu.png" alt="右键图片 / 表格一步加题注，图题在下、表题在上" onerror="this.src='/plugins/siyuan-xref/assets/context-menu.png'">
+<img src="https://cdn.jsdelivr.net/gh/taotaochen86/siyuan-xref@main/assets/context-menu.png" alt="右键图片 / 表格一步加题注，图题在下、表题在上" onerror="this.onerror=null;this.src='/plugins/siyuan-xref/assets/context-menu.png'">
 
 
 ### 2.4 图片 / 表格：在正确的位置插题注
@@ -444,6 +444,7 @@
 - 1.0.7 → 1.0.8：面板顶部新增「类型 + 所属标题」筛选。无需迁移，编号规则一字未动。
 - 1.0.8 → 1.0.9：界面从中英两套扩到 **10 种语言**（补繁中、日、韩、德、法、西、俄、巴葡）；题注前缀识别同步扩到 10 种语言，换语言不会重复编号。无需迁移，编号算法一字未动。
 - 1.0.9 → 1.0.10：只精简集市卡片上的简介（压到 100 字以内），功能、编号规则、菜单结构全部不变。
+- 1.0.10 → 1.0.11：引用面板与设置面板整体重做（跟随思源主题的浅色/深色），设置项按功能折成 5 组；集市详情页补上顶部大图与三张示意插图。**编号规则、引用格式、文档数据一字未动**，无需迁移。
 - 升级后行为没变化 → 手动关开插件一次（见 [7.1](#71-安装与启用)）。
 
 ---
