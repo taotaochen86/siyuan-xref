@@ -172,6 +172,13 @@
   padding: 0 4px;
 }
 
+/* v1.2.8 范围层级下拉：级数越小范围越大，给个提示色和固定宽度，别和章节下拉挤在一起 */
+.xr-panel .xr-level {
+  flex: 0 0 auto;
+  min-width: 118px;
+  color: var(--b3-theme-primary);
+}
+
 /* ── 列表 ───────────────────────────────────────────── */
 .xr-list {
   overflow-y: auto;
@@ -233,6 +240,23 @@
   flex: 1 1 auto;
   min-width: 0;
   color: var(--b3-theme-on-surface, #5f6368);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* v1.2.10：文档名放在本行最右侧，弱化成灰色小字，不再单独占一行 */
+.xr-doc {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 38%;
+  margin-left: auto;
+  padding-left: 10px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--b3-theme-on-surface, #5f6368);
+  opacity: .62;
+  text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -366,4 +390,97 @@
   height: 12px;
   border-radius: 2px;
   background: var(--b3-theme-primary, #3575f0);
+}
+
+
+/* ── v1.2.3 设置面板：分组折叠 ─────────────────────────────── */
+.xr-set-group {
+  margin: 6px 0 14px;
+  border: 1px solid var(--b3-border-color, #e4e4e4);
+  border-radius: 10px;
+  background: var(--b3-theme-background, #fff);
+  overflow: hidden;
+}
+.xr-set-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--b3-theme-on-background, #333);
+  background: var(--b3-theme-surface, rgba(127, 127, 127, .05));
+  user-select: none;
+}
+.xr-set-group > summary::-webkit-details-marker { display: none; }
+.xr-set-group > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-left-color: var(--b3-theme-primary, #3575f0);
+  transition: transform .15s ease;
+}
+.xr-set-group[open] > summary::before { transform: rotate(90deg); }
+.xr-set-group-t { flex: 0 0 auto; }
+.xr-set-group-n { margin-left: auto; font-size: 11px; font-weight: 400; opacity: .55; }
+.xr-set-group-b { padding: 0 12px 6px; }
+.xr-set-group .b3-label { padding: 9px 2px; border-bottom: 1px solid var(--b3-border-color, #eee); }
+.xr-set-group .b3-label:last-child { border-bottom: 0; }
+.xr-set-group .b3-label__text { font-size: 11px; line-height: 1.5; opacity: .7; }
+.xr-set-group textarea.b3-text-field {
+  height: auto; min-height: 80px; resize: vertical;
+  width: 100%; box-sizing: border-box;
+  font-family: var(--b3-font-family-code, monospace); font-size: 12px; line-height: 1.5;
+  background: var(--b3-theme-surface, #f6f7f8);
+}
+
+/* ── v1.2.3 插入面板：章节分组 + 行卡片化 ───────────────────── */
+.xr-list .xr-group { margin: 10px 14px 3px; }
+.xr-list .xr-item { margin: 2px 8px; border-radius: 8px; }
+.xr-list .xr-item.xr-cur { box-shadow: inset 3px 0 0 var(--b3-theme-primary, #3575f0); }
+
+/* v1.2.4：分组必须留在可滚动的内容区里 */
+.b3-dialog__content.xr-setting { overflow-y: auto; }
+
+
+/* ── v1.2.12 设置面板：标签在上 + 控件全宽 + 轻量美化（2026-11-10） ──
+   依据：思源设置内容区实测 639px，左右两列必挤（长期记忆 04j）；描述压到 1~2 行。
+   作用域锁在 .xr-setting .xr-set-group，不污染思源其它面板。 */
+.xr-setting .xr-set-group .b3-label,
+.xr-setting .xr-set-group .b3-label > .fn__flex {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.xr-setting .xr-set-group .b3-label > .fn__space,
+.xr-setting .xr-set-group .b3-label > .fn__flex > .fn__space { display: none; }
+.xr-setting .xr-set-group .b3-label > .fn__flex-1 { width: 100%; }
+.xr-setting .xr-set-group .b3-label > div:first-child,
+.xr-setting .xr-set-group .b3-label > .fn__flex > div:first-child { width: 100%; }
+.xr-setting .xr-set-group .b3-label > .b3-select,
+.xr-setting .xr-set-group .b3-label > .b3-text-field,
+.xr-setting .xr-set-group .b3-label > textarea,
+.xr-setting .xr-set-group .b3-label > div:not(:first-child):not(.fn__flex-1):not(.fn__space),
+.xr-setting .xr-set-group .b3-label > .fn__flex > .b3-select,
+.xr-setting .xr-set-group .b3-label > .fn__flex > .b3-text-field,
+.xr-setting .xr-set-group .b3-label > .fn__flex > textarea {
+  width: 100%; box-sizing: border-box;
+}
+.xr-setting .xr-set-group .b3-label > input.b3-switch,
+.xr-setting .xr-set-group .b3-label > .fn__flex > input.b3-switch { align-self: flex-start; }
+.xr-setting .xr-set-group .config-name {
+  font-size: 13px; font-weight: 500; line-height: 1.45;
+  color: var(--b3-theme-on-background, #202124);
+}
+.xr-setting .xr-set-group .b3-label__text { font-size: 11.5px; line-height: 1.5; opacity: .68; }
+.xr-setting .xr-set-group .b3-label__desc { font-size: 11.5px; line-height: 1.5; opacity: .68; }
+.xr-setting .xr-set-group .b3-label { padding: 11px 2px; }
+.xr-set-group > summary { border-left: 3px solid var(--b3-theme-primary, #3575f0); }
+.xr-set-group-n {
+  padding: 1px 8px; border-radius: 10px;
+  background: var(--b3-theme-primary-lightest, rgba(53,117,240,.10));
+  color: var(--b3-theme-primary, #3575f0); font-weight: 500;
 }

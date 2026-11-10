@@ -1,4 +1,5 @@
-# Figure, Table & Equation Cross-Reference (siyuan-xref) v1.0.8
+# Figure, Table & Equation Cross-Reference (siyuan-xref) v1.2.18
+
 
 **Chinese**: [README.md](./README.md) ｜ Install: SiYuan → Settings → Marketplace → Plugins → search "图表公式交叉引用" or `xref`
 
@@ -124,6 +125,7 @@ A figure or a table **cannot be its own caption block** — writing a number int
 - The dropdown next to it lists the outline indented by H1 / H2; picking a chapter restricts the list to that section **including its sub-sections**, and only headings that actually contain captions are listed.
 - Kind, section and search **stack on top of each other**: with a hundred captions, click Table, pick chapter 3, then choose from the two or three rows left.
 - Keyboard habits are unchanged: `↑↓` to select, `Enter` to insert, `Esc` to close — the buttons are mouse-only and never steal focus.
+- Since v1.2.18: candidates are sorted by the built-in `name` in **natural order** (`Figure 3-2` before `Figure 3-10`); equation rows show LaTeX source first and render asynchronously after the panel is visible, so KaTeX loading never blocks the picker.
 
 ---
 
@@ -265,6 +267,8 @@ The marketplace already has mature "document styling / typography enhancement" p
 | `/api/block/checkBlockExist` | Real-time liveness check (returns false within 0 ms of a delete) |
 | `/api/block/getBlockKramdown` | Fallback content read |
 | `/api/attr/getBlockAttrs` · `/api/attr/setBlockAttrs` | Read / write `custom-xref`, `name`, `style` |
+| `/api/block/getDocBlocksOrders` · `/api/block/getBlockDOMs` · `/api/block/checkBlocksExist` | Scope block order; batch DOM reads and liveness checks (one request instead of one per block) |
+| `/api/block/batchUpdateBlock` · `/api/attr/batchSetBlockAttrs` · `/api/attr/batchGetBlockAttrs` | Batch block writes (**always `dataType: "dom"`**) / batch attribute writes / reads. Block writes must precede attribute writes or `name` / `style` get overwritten |
 | `/api/block/getChildBlocks` | Fallback ordering (when `getDoc` fails entirely) |
 
 Plugin-side capabilities: `protyleSlash` (slash triggers), `addCommand` (native commands, rebindable under Settings → Hotkeys → Plugin), `fetchSyncPost`, `eventBus` (`ws-main` transaction events drive the automatic run).
@@ -515,6 +519,9 @@ Safety nets: empty equations are never numbered; the whole run is skipped while 
 | Block list | Recursive `getChildBlocks`, one call per block: 348 blocks → 349 round trips / ~1.5 s | One SQL query + one `getDoc` for ordering: **2 round trips / ~0.33 s** |
 | Row count | SQL silently truncated at 64 rows | Always `limit -1` |
 | Ordering basis | Recursive walk | Order of `data-node-id` occurrences in the HTML (DFS pre-order); verified against the recursive result on 68 real documents (2–348 blocks) with identical output |
+| Scope collection (40 docs) | Full scan: 1011 blocks / 24.33 ms | Only captions / equations / headings / reference blocks: 257 blocks / 6.15 ms (~4x), with full-scan fallback |
+| Picker candidates | Walk the document tree + one `getDocBlocksOrders` per doc + build a full renumbering plan | One `attributes` SQL: 3.14 ms / 87 rows, natural `name` order, async KaTeX |
+| Renumber writes | One `updateBlock` + one `setBlockAttrs` per block, with serial waits | One batch block write + one batch attribute write (content first), per-block fallback on failure |
 
 ### 9.4 The three guards around automatic runs
 
@@ -557,3 +564,50 @@ The marketplace only consumes `package.zip` from the GitHub **Latest Release**. 
 ## 11 License
 
 MIT License © 2026 ttChen
+
+---
+
+## 12 Changelog
+
+**v1.2.18**: (1) Settings are split into two collapsible sections — "Single document (general)" and "Book / multi-document (scope)", with the eight scope options folded by default; both JSON textareas are now full-width and about four lines tall, descriptions were rewritten as short accurate one-to-two-line hints, and spacing / section accents are consistent. (2) Batch kernel APIs — `getBlockDOMs`, `checkBlocksExist`, `batchUpdateBlock`, `batchSetBlockAttrs` — replace per-block calls, with automatic per-block fallback; measured 3.0x / 37.7x on reads. (3) Scope collection fetches only the blocks actually needed (filtered SQL with a full-scan fallback): 40 documents, 1011 blocks / 24.33 ms -> 257 blocks / 6.15 ms (~4x). (4) The picker now uses a single `attributes` SQL query instead of walking the document tree, sorts by the built-in `name` in natural order, and renders KaTeX asynchronously after the panel is visible; measured 3.14 ms / 87 rows. (5) Fixed three regressions: inline right-click inserts degraded to plain text, batch writes overwrote `name` / `style` attributes, and the fast picker path dropped caption previews. (6) The companion plugin has been renamed to [Tree Document Numbering](https://github.com/taotaochen86/tree-doc-numbering). This release ships every local iteration since v1.0.11 at once; no migration and no settings changes needed.
+
+**v1.2.11**: the picker **still opens** when the current document or the current scope level has no captions (previously it only showed a toast and returned, leaving no way to switch levels). On open, if the selected level is empty, it **auto-widens one level at a time** (3 this chapter -> 2 sibling chapters -> 1 across parts) until captions are found, and says so in the header. It never auto-jumps to **Level 0** (all notebooks still requires an explicit choice). Typical case: a document whose `rootNum` has only two segments (`1.1`) but level 3 is remembered — the chain key cannot be computed, so it widens to level 2 and finds the local `Figure 1-1`. Auto-widening affects this panel only and **does not overwrite the remembered level / type / chapter**.
+
+
+**v1.2.10**: removed the per-document group headers that took a whole row in the picker list. The document name now sits at the **far right of each caption row** as small muted text (ellipsised, full name on hover). Only shown in scope mode.
+
+
+**v1.2.9**: (1) Added **Level 0 = across all notebooks** (the widest option, chosen explicitly; levels 1+ stay locked to one top root). Ladder: level 3 = this chapter, 2 = sibling chapters, 1 = across parts, 0 = across all notebooks. (2) The picker now remembers the **type chips (All/Figure/Table/Equation), level dropdown and chapter dropdown** in `settings.json` and restores them on every open; the search box is still cleared each time.
+
+
+**v1.2.8**: the picker now uses an explicit **scope level**. Each level is locked to the same top root and the same first N segments of the numbering chain, read from the document attribute `custom-doc-num-meta` (`rootID` / `rootNum`); nothing outside the scope is ever listed, and the "All scope (cross-chapter)" escape hatch is gone. Default = one level above the chapter prefix level (prefix level 3 -> scope level 2, so sibling chapters are available). Use the level dropdown at the top of the picker to widen to level 1 (across parts) or narrow to level 3 (this chapter only). Affects the picker list only, not scope renumbering.
+
+**v1.2.7**: fixed the picker showing captions from unrelated scopes when the current document had no resolvable parent chain — it used to fall back to All chapters. Now it walks up `path` to the nearest numbered ancestor, and if that still fails it defaults to the first chapter group, **never to All**. The All option is labelled "All scope (cross-chapter)" so the switch is explicit.
+
+**v1.2.6**: removed the per-row document badge from the insert picker as requested — the document name is already in the chapter group heading (`chain · document`), so showing it twice was cluttered. Each row shows only the number chip and caption/formula preview; group headings, the chapter dropdown and the header subtitle no longer prefix the chain (e.g. `1.2 ·`) and show only the document name. Rows are sorted by parent chain + document, one heading per document.
+
+**v1.2.5: picker narrows at level `n-1` by default.** Numbering still uses level n (e.g. level 3 -> `Figure 4-1`), but the picker narrows by the level-(n-1) parent chain so sibling chapters can cross-reference: `4.1 test` (`1.2.4.1`) and `3.7 AAAAA` (`1.2.3.7`) both belong to `1.2` at level 2. The chapter dropdown now covers the **whole scope** (grouped by parent chain, still keyed by `rootID`), defaults to the current parent chain, and can switch to any chapter or All chapters. Per-target overrides are decremented too; `n=0` (full chain) means no narrowing.
+
+**v1.2.4 layout fix**: v1.2.3 appended the groups to `.b3-dialog__body` while the 19 items were moved out of `.b3-dialog__content`; the emptied content still occupied ~825px, producing a huge blank area and breaking scrolling. Groups are now inserted back into the **direct parent at the original first-item position**, with `overflow-y:auto` as a fallback.
+
+**v1.2.3 UI redesign**: settings are now **grouped into collapsible sections** (Scope / Numbering & appearance / References & automation / Advanced, collapsed by default), fixing the old group decorator that silently stopped working when the item count grew from 12 to 19. Large textareas collapse to one line and expand on focus; descriptions are smaller. The insert picker gains **chapter group headings** (`chain · document`) and card-style rows, on top of the chapter filter dropdown.
+
+**v1.2.2**: fully removed two unused features per user request — "Advanced: inherited scope subset" (setting, `scopeSubsetOnly/Excluded` defaults, `xrScopeSubset`, i18n and tests) and "Auto-detect caption text" (`textDetect` default, prefix detection in `classify`, setting, i18n). Behaviour is now equivalent to the old "auto-detect = off": only `custom-xref` attributes and math blocks count. The insert picker also regains its **chapter filter** dropdown: in scope mode it groups by document, labels options with the chapter chain (e.g. `1.2.3 · Chapter 3`) and lists only documents that actually have captions.
+
+**v1.2.0: chapter prefix level can be set per doc-numbering scope (plan A).** The doc-numbering plugin v0.9.0 adds `targetId` (= `targets[].id`) to `custom-doc-num-meta`; xref keeps the global "Chapter prefix level" as default and adds "Per-scope level overrides (JSON)" like `{"<targetId>": 2}`. Scope renumbering, single-document auto renumbering and picker chapter narrowing all resolve the level from each document's `targetId`.
+
+**v1.1.9 fix: the picker narrowing key now includes `rootID`.** Numbering restarts at 1 in every scope root (notebook / top-level doc), so two trees can both have `1.2.3` while being different chapters. v1.1.8 compared only the level-N chain and mixed captions from other roots into the picker. The key is now `rootID | level-N chain`.
+
+**v1.1.8: the insert picker now auto-narrows to the current level-N chapter** — with level 3 selected it lists only captions from the current level-3 document and its descendants, excluding captions from other level-3 documents; an on-by-default switch controls it. The v1.1.7 hand-written JSON box is kept as "Advanced: inherited scope subset" and affects **scope renumbering** only; picker narrowing filters one more layer on top of that result.
+
+**v1.1.7: scope subsetting** — new "Scope subset (inherited)" setting keeps the xref scope **always a subset of the doc-numbering plugin scope**: `only` retains selected documents/subtrees, `extraExcluded` removes more; both empty = full inheritance. With the "follow doc-numbering plugin" source the config is read live, so changes there are followed automatically instead of copying a snapshot.
+
+**v1.1.6**: new "Chapter prefix level" setting — pick level N of `rootNum` (or the full chain) for the by-document prefix; defaults to **level 2** (`2.1.2.3` → `1` → `Figure 1-1`). If the level does not exist (`1.2.3` at level 4), no level prefix is shown. Applies to both scope and single-document renumbering.
+
+**v1.1.5**: the insert picker is now scope-aware — with scope enabled, `/xref` / `Ctrl+Alt+R` lists captions from **every document in the configured scope**, shows the owning document on each row, and supports searching by document title. Insertion still uses static `((id "anchor"))` with `data-subtype="s"`. v1.1.4 made single-document auto renumbering use `rootNum`; v1.1.3 fixed custom scope sources losing meta.
+
+**v1.1.4**: with scope enabled, single-document auto renumbering also uses that document's `rootNum` (one `batchGetBlockAttrs` call, no scope scan), so editing no longer rewrites `Figure 2.1.2.3-1` back to `Figure 1-1`. v1.1.3 fixed custom scope sources losing meta.
+
+**v1.1.3**: fixes custom scope sources not loading `custom-doc-num-meta`, which made "by document" prefixes fall back to plain document indices; `resolveScopeDocs()` now fills meta via one `batchGetBlockAttrs` call.
+
+**v1.1.2**: scope renumbering uses the kernel `/api/block/getDocBlocksOrders` API for block order, adds an incremental cache (document-level events never rescan document internals; in-document edits rescan only that one document), and refreshes reference anchors by editing the DOM directly. v1.1.1 reads `rootNum` from `custom-doc-num-meta`. v1.1.0 added optional multi-document scope renumbering (off by default).

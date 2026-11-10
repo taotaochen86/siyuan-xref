@@ -28,6 +28,35 @@ const UI_TEXT = {
         // 原生命令
         "cmd.insert": "插入交叉引用", "cmd.renumber": "重排图表编号",
         "cmd.undo": "撤销上次重排", "cmd.redo": "重做重排",
+        "cmd.scope": "重排范围内全部文档",
+        "slash.scope.text": "重排范围编号", "slash.scope.meta": "多文档交叉引用",
+
+        // 多文档范围重排（v1.1.0）
+        "set.scope.levelByTarget": "按范围配置覆盖层级（JSON）",
+        "set.scope.levelByTarget.desc": "给不同范围单独指定层级。留空则沿用上面的设置。",
+        "set.scope.level": "章节前缀层级",
+        "set.scope.level.desc": "编号带几层章节号。全带 2.1.2-1；只带第 1 层 1-1。",
+        "set.scope.level.all": "全部（完整链）",
+        "set.scope.level.n": "第 {0} 级",
+        "set.scope.on": "启用范围重排", "set.scope.on.desc": "关闭后只处理当前文档，不跨文档编号。",
+        "set.scope.source": "范围来源", "set.scope.source.desc": "选来源：跟「树文联动编号」插件，或自己指定范围。插件：https://github.com/taotaochen86/tree-doc-numbering",
+        "set.scope.source.docnum": "跟随树文联动编号", "set.scope.source.custom": "本插件自定义范围",
+        "set.scope.mode": "范围编号口径", "set.scope.mode.desc": "全书连续：整本书从图 1 排到图 N；按文档前缀：每篇单独起号，如「图 1-1」。",
+        "set.scope.mode.continuous": "全书连续", "set.scope.mode.bydoc": "按文档前缀",
+        "set.scope.events": "结构事件自动重排", "set.scope.events.desc": "文档增删改名或调顺序后，自动重排一次（停手 3 秒）。",
+        "set.scope.pickerAuto": "交叉引用窗口默认按上一级范围",
+        "set.scope.pickerAuto.desc": "打开引用窗口时默认列出上一级范围的图表公式，方便跨章引用；窗口顶部可随时改。",
+        "set.scope.custom": "自定义范围（JSON）", "set.scope.custom.desc": "格式 {\"targets\":[{\"type\":\"doc\",\"id\":\"...\"}],\"excluded\":[]}；可点「从树文联动编号导入」自动填。",
+        "set.scope.import": "从树文联动编号导入",
+        "set.scope.import.ok": "已导入 {0} 个范围、{1} 条排除",
+        "set.scope.import.fail": "没找到树文联动编号插件，或它还没加载",
+        "msg.scope.none": "范围为空：请先在设置里选范围来源或导入范围",
+        "msg.scope.dry": "范围预检：{0} 篇文档 / 将改 {1} 处题注、{2} 处引用（未写入）",
+        "msg.scope.done": "范围重排完成：{0} 篇文档 / 改 {1} 处题注、{2} 处引用",
+        "msg.scope.busy": "范围重排正在进行，请稍后再试",
+        "msg.scope.readfail": "范围采集失败，整批未写入：{0}",
+        "msg.scope.limit": "范围含 {0} 篇文档，超过安全上限，已中止",
+        "msg.scope.nodn": "树文联动编号插件未加载，已退回自定义范围",
 
         // 右键菜单
         "menu.setFig": "设为图题注", "menu.setTab": "设为表题注",
@@ -44,6 +73,14 @@ const UI_TEXT = {
         "hint.default": "图表题注：请右键图片/表格本身，或图下方（表上方）的题注段落",
 
         // 设置面板：分组标题（装饰用，拿不到容器就不显示）
+        "picker.allScope": "全部范围（跨章节）",
+        "picker.allInLevel": "当前范围（全部章节）",
+        "picker.levelN": "第 {0} 级范围",
+        "picker.level0": "第 0 级 · 跨所有笔记本",
+        "picker.levelTip": "交叉引用范围层级：级数越小范围越大。第 3 级只本章，第 2 级可引用同篇其它章节，第 1 级可跨篇，第 0 级跨所有笔记本。类型按钮、层级、章节三项会记住上次选择；搜索框每次打开清空。",
+        "set.grp.scope": "范围设置", "set.grp.items": "{0} 项",
+        "set.grp.single": "单页模式（通用设置）",
+        "set.grp.book": "书籍多页模式（范围设置）",
         "set.grp.num": "编号",
         "set.grp.trigger": "触发与引用",
         "set.grp.look": "题注外观",
@@ -57,11 +94,9 @@ const UI_TEXT = {
         "set.labels.title": "图 / 表 / 式 标签",
         "set.labels.desc": "题注前缀文字，可填 Figure / Table / Eq",
         "set.refs.title": "重排时同步刷新引用",
-        "set.refs.desc": "同时改写 ((块ID \"旧锚文本\"))；关闭后只动编号",
+        "set.refs.desc": "重排时正文里的「图 2」等引用文字一起更新；关闭后只改编号。",
         "set.auto.title": "自动重排",
-        "set.auto.desc": "停手 1.5 秒后自动重排；不写入光标所在的块",
-        "set.detect.title": "文字自动识别",
-        "set.detect.desc": "正文以「图 3」「表 2」开头的段落自动当题注；关掉后只认右键设的",
+        "set.auto.desc": "停手 1.5 秒后自动重排；刚编辑过的块会等一下再改。",
         "set.dead.title": "失效引用怎么处理",
         "set.dead.desc": "指向已删块的引用怎么处理。默认不动手，按 Ctrl+Alt+Z 重建块后自动接回",
         "set.dead.off": "不处理，保持原样（推荐）",
@@ -80,7 +115,7 @@ const UI_TEXT = {
         "set.undo.title": "撤销步数",
         "set.undo.desc": "插件自带的撤销栈保留几轮（1~50）；思源 Ctrl+Z 撤不到插件写入",
         "set.restore.title": "还原失效引用",
-        "set.restore.desc": "把被「转成文本」烧掉的引用改回 ((块ID \"锚\"))，块已删的跳过",
+        "set.restore.desc": "把转成普通文字的引用改回可点击引用；目标已删的跳过。",
         "set.restore.btn": "还原当前文档", "set.restore.busy": "还原中…",
         "set.debug.title": "诊断日志（排查用）",
         "set.debug.desc": "只在排查问题时开，长期开会拖慢思源",
@@ -130,9 +165,13 @@ const UI_TEXT = {
         "msg.insertFail": "插入失败：{0}",
 
         // 交叉引用选择面板
-        "picker.title": "插入交叉引用",
+        "picker.title": "插入交叉引用", "picker.scope": "范围",
         "picker.ph": "搜索编号或题注，↑↓ 选择，回车插入，Esc 关闭",
         "picker.empty": "没有匹配项",
+        "picker.autoWiden": "当前范围没有题注，已自动放宽到{0}",
+        "picker.widenNone": "当前范围没有题注，可手动切到「第 0 级 · 跨所有笔记本」",
+        "picker.emptyScopeOff": "本文档没有题注，可在设置里开启范围模式引用其它文档",
+        "picker.typeEmptyHint": "点「全部」可看到被类型筛选挡住的 {0} 条题注",
         "picker.all": "全部",
         "picker.allSec": "全部章节",
         "picker.secTip": "只看某个标题下的图 / 表 / 式（含它的子标题）",
@@ -148,6 +187,34 @@ const UI_TEXT = {
         "slash.num.text": "Renumber captions", "slash.num.meta": "refresh references too",
         "cmd.insert": "Insert cross-reference", "cmd.renumber": "Renumber captions",
         "cmd.undo": "Undo last renumber", "cmd.redo": "Redo renumber",
+        "cmd.scope": "Renumber all docs in scope",
+        "slash.scope.text": "Renumber scope", "slash.scope.meta": "multi-document xref",
+
+        "set.scope.levelByTarget": "Per-scope level overrides (JSON)",
+        "set.scope.levelByTarget.desc": "Key = doc-numbering target id (targets[].id, stored as custom-doc-num-meta.targetId); value = which level to use (0 = full chain). Targets not listed use the global level above. e.g. {\"20230217164836-id29ja1\": 2}.",
+        "set.scope.level": "Chapter prefix level",
+        "set.scope.level.desc": "Which level of rootNum to use as the by-document prefix: All = full chain (2.1.2.3); level 2 = take 1 -> Figure 1-1. If the level does not exist (1.2.3 at level 4), no level prefix is shown.",
+        "set.scope.level.all": "All (full chain)",
+        "set.scope.level.n": "Level {0}",
+        "set.scope.on": "Enable scope renumbering", "set.scope.on.desc": "Off = behaviour identical to 1.0.11 (current document only).",
+        "set.scope.source": "Scope source", "set.scope.source.desc": "Follow the doc-numbering plugin's targets/excluded, or use this plugin's own list.",
+        "set.scope.source.docnum": "Follow doc-numbering plugin", "set.scope.source.custom": "Custom scope in this plugin",
+        "set.scope.mode": "Scope numbering", "set.scope.mode.desc": "Continuous: Figure 1..N across all docs; By document: Figure <selected level of rootNum>-<n>, where rootNum comes from the document custom-doc-num-meta attribute. Pick the level below; falls back to the document-tree index when absent.",
+        "set.scope.mode.continuous": "Continuous", "set.scope.mode.bydoc": "By document prefix",
+        "set.scope.events": "Auto renumber on structural events", "set.scope.events.desc": "Filter create/move/rename/sort by box; fall back to full scope when unsure. 3s debounce, serialised.",
+        "set.scope.pickerAuto": "Default picker scope to parent level",
+        "set.scope.pickerAuto.desc": "On: picker defaults to one level above the chapter prefix level (prefix level 3 -> scope level 2, so captions in sibling chapters are available). Off: defaults to the current level (this chapter only). Level dropdown: 3 = this chapter, 2 = sibling chapters, 1 = across parts, 0 = across all notebooks. Levels 1+ are locked to the same top root and the same first N segments of the numbering chain; level 0 is the only cross-notebook option and must be picked explicitly. Type chips, level and chapter selections are remembered; the search box is cleared on every open. Affects the picker list only, not scope renumbering.",
+        "set.scope.custom": "Custom scope (JSON)", "set.scope.custom.desc": "{\"targets\":[{\"type\":\"doc\",\"id\":\"...\"}],\"excluded\":[]}; or import from the doc-numbering plugin.",
+        "set.scope.import": "Import from doc-numbering plugin",
+        "set.scope.import.ok": "Imported {0} targets, {1} exclusions",
+        "set.scope.import.fail": "Doc-numbering plugin not loaded",
+        "msg.scope.none": "Empty scope: choose a source or import one in settings",
+        "msg.scope.dry": "Scope dry-run: {0} docs / {1} captions, {2} references would change (nothing written)",
+        "msg.scope.done": "Scope renumbered: {0} docs / {1} captions, {2} references",
+        "msg.scope.busy": "Scope renumbering is already running",
+        "msg.scope.readfail": "Scope collection failed, nothing was written: {0}",
+        "msg.scope.limit": "Scope has {0} docs, over the safety limit, aborted",
+        "msg.scope.nodn": "Doc-numbering plugin not loaded, falling back to custom scope",
 
         "menu.setFig": "Set as figure caption", "menu.setTab": "Set as table caption",
         "menu.clear": "Clear caption",
@@ -162,6 +229,14 @@ const UI_TEXT = {
         "hint.math": "Captions: equation blocks are numbered automatically, no caption needed",
         "hint.default": "Captions: right-click the image / table itself, or the caption paragraph below a figure (above a table)",
 
+        "picker.allScope": "All scope (cross-chapter)",
+        "picker.allInLevel": "Current scope (all chapters)",
+        "picker.levelN": "Level {0} scope",
+        "picker.level0": "Level 0 · all notebooks",
+        "picker.levelTip": "Cross-reference scope level: smaller = wider. Level 3 = this chapter, level 2 = sibling chapters in the same part, level 1 = across parts, level 0 = across all notebooks. Type chips, level and chapter selections are remembered; the search box is cleared on every open.",
+        "set.grp.scope": "Scope", "set.grp.items": "{0} items",
+        "set.grp.single": "Single Page (general)",
+        "set.grp.book": "Book / Multi-page (scope)",
         "set.grp.num": "Numbering",
         "set.grp.trigger": "Trigger & references",
         "set.grp.look": "Caption look",
@@ -177,8 +252,6 @@ const UI_TEXT = {
         "set.refs.desc": "Also rewrites ((block id \"old anchor\")); off = change numbers only",
         "set.auto.title": "Auto renumber",
         "set.auto.desc": "Renumbers 1.5 s after you stop typing; never writes into the block holding the caret",
-        "set.detect.title": "Detect captions from text",
-        "set.detect.desc": "A paragraph starting with Figure 3 / 图 3 / Table 2 counts as a caption; off = only right-click captions",
         "set.dead.title": "Broken references",
         "set.dead.desc": "References to deleted blocks. Default is to leave them alone — Ctrl+Alt+Z rebuilds the block and reconnects them",
         "set.dead.off": "Leave alone (recommended)",
@@ -245,9 +318,13 @@ const UI_TEXT = {
         "msg.readFail": "siyuan-xref read failed: {0}",
         "msg.insertFail": "Insert failed: {0}",
 
-        "picker.title": "Insert cross-reference",
+        "picker.title": "Insert cross-reference", "picker.scope": "Scope",
         "picker.ph": "Search by number or caption · ↑↓ to choose · Enter to insert · Esc to close",
         "picker.empty": "No matches",
+        "picker.autoWiden": "No captions at this level — auto-widened to {0}",
+        "picker.widenNone": "No captions in this scope — switch to Level 0 (all notebooks) manually",
+        "picker.emptyScopeOff": "No captions in this document — enable scope mode in settings to reference other documents",
+        "picker.typeEmptyHint": "Click All to reveal {0} caption(s) hidden by the type filter",
         "picker.all": "All",
         "picker.allSec": "All sections",
         "picker.secTip": "Show only the figures / tables / equations under one heading (sub-headings included)",
@@ -271,6 +348,8 @@ const UI_TEXT = {
         "noun.image": "圖片", "noun.table": "表格",
         "hint.table": "圖表題註：表格儲存格內不支援，請右鍵表格本身或表格上方的題註段落", "hint.mixed": "圖表題註：請選取同類區塊（段落，或單張圖／單一表格）",
         "hint.math": "圖表題註：公式區塊會自動編號，不用設題註", "hint.default": "圖表題註：請右鍵圖片／表格本身，或圖下方（表上方）的題註段落",
+        "set.grp.single": "單頁模式（通用設定）",
+        "set.grp.book": "書籍多頁模式（範圍設定）",
         "set.grp.num": "編號",
         "set.grp.trigger": "觸發與引用",
         "set.grp.look": "題註外觀",
@@ -281,7 +360,6 @@ const UI_TEXT = {
         "set.labels.title": "圖／表／式 標籤", "set.labels.desc": "題註前置文字，例如填 Figure / Table / Eq",
         "set.refs.title": "重排時同步更新引用", "set.refs.desc": "把 ((區塊ID \"舊錨文字\")) 全部改成新編號。關閉後只改編號不動引用",
         "set.auto.title": "自動重排", "set.auto.desc": "寫完題註停手 1.5 秒後自動重排編號並更新引用。不會寫入游標所在的區塊，避免打斷輸入",
-        "set.detect.title": "文字自動辨識", "set.detect.desc": "正文以「圖 3 ……」「表 2 ……」開頭的段落自動當作題註參與編號。關掉後只認右鍵選單設的題註（custom-xref 屬性）——正文裡順口寫到「圖 3 中可以看出」這種普通段落就不會被誤編號。自動辨識本來就要等索引到位，慢一點沒關係；右鍵設的題註不受此開關影響，點了立刻生效",
         "set.dead.title": "失效引用如何處理", "set.dead.desc": "指向已刪區塊、或指向「已取消題註」的區塊的引用。預設「不處理」：引用原樣留著，刪區塊後按 Ctrl+Alt+Z 能把區塊重建回來、引用自動接回；「僅標紅」會在正文裡塗紅加刪除線（看起來像內容被改壞）；「轉成文字」會讓引用徹底失效、無法還原，還會等 10 秒才動作",
         "set.dead.off": "不處理，保持原樣（建議）", "set.dead.mark": "僅標紅，保留引用",
         "set.dead.text": "轉成紅色刪除線文字（不可逆）", "set.center.title": "題註置中",
@@ -340,6 +418,8 @@ const UI_TEXT = {
         "noun.image": "画像", "noun.table": "表",
         "hint.table": "キャプション：表のセル内では使えません。表そのもの、または表の上のキャプション段落を右クリックしてください", "hint.mixed": "キャプション：同じ種類のブロックを選んでください（段落、または画像 1 枚 / 表 1 つ）",
         "hint.math": "キャプション：数式ブロックは自動で番号が付くので、キャプションは不要です", "hint.default": "キャプション：画像 / 表そのもの、または図の下（表の上）のキャプション段落を右クリックしてください",
+        "set.grp.single": "単一ドキュメント（共通設定）",
+        "set.grp.book": "書籍・複数ドキュメント（範囲設定）",
         "set.grp.num": "番号",
         "set.grp.trigger": "トリガーと参照",
         "set.grp.look": "キャプションの外観",
@@ -350,7 +430,6 @@ const UI_TEXT = {
         "set.labels.title": "図 / 表 / 式 のラベル", "set.labels.desc": "番号の前に付ける文字。例：Figure / Table / Eq",
         "set.refs.title": "振り直し時に参照も更新", "set.refs.desc": "((ブロックID \"旧アンカー\")) をすべて新しい番号に書き換えます。オフにすると番号だけ変わり、参照はそのままです",
         "set.auto.title": "自動で振り直す", "set.auto.desc": "入力が止まって 1.5 秒後に番号を振り直し、参照も更新します。カーソルのあるブロックには書き込まないので、入力の邪魔をしません",
-        "set.detect.title": "本文からキャプションを自動判定", "set.detect.desc": "「図 3 ……」「表 2 ……」で始まる段落をキャプションとみなして番号を付けます。オフにすると右クリックメニューで設定したキャプション（custom-xref 属性）だけを対象にするので、「図 3 に示すように」のような本文中の普通の段落が誤って番号を付けられることはありません。自動判定はインデックスの反映待ちが必要で多少遅れますが問題ありません。右クリックで設定したキャプションはこのスイッチの影響を受けず、すぐ反映されます",
         "set.dead.title": "リンク切れ参照の扱い", "set.dead.desc": "削除済みブロック、またはキャプションを解除したブロックを指す参照です。既定の「何もしない」では参照はそのまま残り、ブロックを削除しても Ctrl+Alt+Z で元の ID のまま復元でき、参照もつながります。「赤くマーク」は本文に赤い取り消し線を引きます（内容が壊れたように見えます）。「テキストに変換」は参照が完全に失われ元に戻せず、実行まで 10 秒待ちます",
         "set.dead.off": "何もしない（推奨）", "set.dead.mark": "赤くマークし、参照は残す",
         "set.dead.text": "赤い取り消し線テキストに変換（元に戻せません）", "set.center.title": "キャプションを中央揃え",
@@ -409,6 +488,8 @@ const UI_TEXT = {
         "noun.image": "이미지", "noun.table": "표",
         "hint.table": "캡션: 표 셀 안에서는 지원하지 않습니다. 표 자체나 표 위의 캡션 단락을 마우스 오른쪽 버튼으로 클릭하세요", "hint.mixed": "캡션: 같은 종류의 블록을 선택하세요 (단락, 또는 이미지 한 장 / 표 하나)",
         "hint.math": "캡션: 수식 블록은 번호가 자동으로 매겨지므로 캡션이 필요하지 않습니다", "hint.default": "캡션: 이미지 / 표 자체, 또는 그림 아래(표 위)의 캡션 단락을 마우스 오른쪽 버튼으로 클릭하세요",
+        "set.grp.single": "단일 문서 (공통 설정)",
+        "set.grp.book": "책 / 여러 문서 (범위 설정)",
         "set.grp.num": "번호",
         "set.grp.trigger": "트리거와 참조",
         "set.grp.look": "캡션 모양",
@@ -419,7 +500,6 @@ const UI_TEXT = {
         "set.labels.title": "그림 / 표 / 식 라벨", "set.labels.desc": "번호 앞에 붙는 글자. 예: Figure / Table / Eq",
         "set.refs.title": "번호를 다시 매길 때 참조도 갱신", "set.refs.desc": "((블록ID \"이전 앵커\"))를 모두 새 번호로 바꿉니다. 끄면 번호만 바뀌고 참조는 그대로 둡니다",
         "set.auto.title": "자동 번호 매기기", "set.auto.desc": "입력을 멈추고 1.5초 후 번호를 다시 매기고 참조를 갱신합니다. 커서가 있는 블록에는 쓰지 않으므로 입력을 방해하지 않습니다",
-        "set.detect.title": "본문에서 캡션 자동 인식", "set.detect.desc": "「그림 3 ……」「표 2 ……」로 시작하는 단락을 캡션으로 보고 번호를 매깁니다. 끄면 마우스 오른쪽 메뉴로 지정한 캡션(custom-xref 속성)만 대상으로 하므로, 「그림 3에서 볼 수 있듯이」 같은 본문의 일반 단락이 잘못 번호 매겨지지 않습니다. 자동 인식은 색인 반영을 기다려야 해서 조금 늦지만 문제없습니다. 오른쪽 메뉴로 지정한 캡션은 이 스위치와 무관하게 즉시 적용됩니다",
         "set.dead.title": "끊긴 참조 처리", "set.dead.desc": "삭제된 블록이나 캡션을 해제한 블록을 가리키는 참조입니다. 기본값 「그대로 두기」는 참조를 그대로 남기고, 블록을 삭제해도 Ctrl+Alt+Z로 원래 ID 그대로 복원되어 참조가 다시 연결됩니다. 「빨갛게 표시」는 본문에 빨간 취소선을 그어 내용이 손상된 것처럼 보입니다. 「텍스트로 변환」은 참조가 완전히 끊겨 되돌릴 수 없고, 실행까지 10초를 기다립니다",
         "set.dead.off": "그대로 두기 (권장)", "set.dead.mark": "빨갛게 표시하고 참조 유지",
         "set.dead.text": "빨간 취소선 텍스트로 변환 (되돌릴 수 없음)", "set.center.title": "캡션 가운데 정렬",
@@ -478,6 +558,8 @@ const UI_TEXT = {
         "noun.image": "des Bildes", "noun.table": "der Tabelle",
         "hint.table": "Beschriftung: In Tabellenzellen nicht möglich – klicken Sie mit der rechten Maustaste auf die Tabelle selbst oder auf die Beschriftung oberhalb der Tabelle", "hint.mixed": "Beschriftung: Bitte Blöcke derselben Art auswählen (Absätze oder ein einzelnes Bild / eine einzelne Tabelle)",
         "hint.math": "Beschriftung: Gleichungsblöcke werden automatisch nummeriert, eine Beschriftung ist nicht nötig", "hint.default": "Beschriftung: Klicken Sie mit der rechten Maustaste auf das Bild / die Tabelle selbst oder auf den Beschriftungsabsatz unter einer Abbildung (über einer Tabelle)",
+        "set.grp.single": "Einzeldokument (allgemein)",
+        "set.grp.book": "Buch / mehrere Dokumente (Bereich)",
         "set.grp.num": "Nummerierung",
         "set.grp.trigger": "Auslöser & Verweise",
         "set.grp.look": "Beschriftungsstil",
@@ -488,7 +570,6 @@ const UI_TEXT = {
         "set.labels.title": "Beschriftungstexte für Abbildung / Tabelle / Gleichung", "set.labels.desc": "Text vor der Nummer, z. B. Abb. / Tab. / Gl.",
         "set.refs.title": "Verweise beim Neuvergeben aktualisieren", "set.refs.desc": "Schreibt jedes ((Block-ID \"alter Anker\")) auf die neue Nummer um. Ausschalten ändert nur die Nummern und lässt Verweise unberührt.",
         "set.auto.title": "Automatisch neu nummerieren", "set.auto.desc": "Nummeriert 1,5 s nach dem letzten Tastendruck neu und aktualisiert die Verweise. Der Block mit dem Cursor wird nie beschrieben, damit die Eingabe nicht unterbrochen wird.",
-        "set.detect.title": "Beschriftungen aus dem Text erkennen", "set.detect.desc": "Ein Absatz, der mit Abb. 3 / Figure 3 / Tab. 2 / Tabelle 2 beginnt, gilt als Beschriftung. Ausschalten akzeptiert nur Beschriftungen aus dem Kontextmenü (Attribut custom-xref), sodass ein normaler Satz wie „wie Abb. 3 zeigt“ nie umnummeriert wird. Die Erkennung muss auf den Index warten, was in Ordnung ist; über das Menü gesetzte Beschriftungen sind davon nicht betroffen und wirken sofort.",
         "set.dead.title": "Defekte Verweise", "set.dead.desc": "Ein Verweis auf einen gelöschten Block oder auf einen Block, dessen Beschriftung entfernt wurde. Standard „unverändert lassen“: der Verweis bleibt stehen, und Ctrl+Alt+Z baut den gelöschten Block mit seiner ursprünglichen ID wieder auf, sodass der Verweis wieder greift. „Rot markieren“ färbt ihn rot mit Durchstreichung, was leicht wie eine Beschädigung des Inhalts aussieht. „In Text umwandeln“ ist unwiderruflich und wartet 10 s vor der Ausführung.",
         "set.dead.off": "Unverändert lassen (empfohlen)", "set.dead.mark": "Rot markieren, Verweis behalten",
         "set.dead.text": "In roten durchgestrichenen Text umwandeln (unwiderruflich)", "set.center.title": "Beschriftungen zentrieren",
@@ -547,6 +628,8 @@ const UI_TEXT = {
         "noun.image": "de la figure", "noun.table": "du tableau",
         "hint.table": "Légendes : impossible dans une cellule de tableau — cliquez avec le bouton droit sur le tableau lui-même ou sur la légende au-dessus", "hint.mixed": "Légendes : sélectionnez des blocs de même type (paragraphes, ou une seule image / un seul tableau)",
         "hint.math": "Légendes : les blocs d'équation sont numérotés automatiquement, aucune légende n'est nécessaire", "hint.default": "Légendes : cliquez avec le bouton droit sur l'image / le tableau lui-même, ou sur le paragraphe de légende sous une figure (au-dessus d'un tableau)",
+        "set.grp.single": "Document unique (général)",
+        "set.grp.book": "Livre / multi-documents (portée)",
         "set.grp.num": "Numérotation",
         "set.grp.trigger": "Déclencheurs et références",
         "set.grp.look": "Apparence des légendes",
@@ -557,7 +640,6 @@ const UI_TEXT = {
         "set.labels.title": "Libellés figure / tableau / équation", "set.labels.desc": "Texte placé devant chaque numéro, par ex. Fig. / Tab. / Éq.",
         "set.refs.title": "Actualiser les références lors de la renumérotation", "set.refs.desc": "Réécrit chaque ((id de bloc \"ancien ancrage\")) avec le nouveau numéro. Désactivez pour ne changer que les numéros et laisser les références intactes.",
         "set.auto.title": "Renumérotation automatique", "set.auto.desc": "Renumérote et actualise les références 1,5 s après la dernière frappe. Le bloc contenant le curseur n'est jamais écrit, la saisie n'est donc pas interrompue.",
-        "set.detect.title": "Détecter les légendes dans le texte", "set.detect.desc": "Un paragraphe commençant par Fig. 3 / Tableau 2 est considéré comme une légende. Désactivez pour n'accepter que les légendes définies par le menu contextuel (attribut custom-xref), afin qu'une phrase ordinaire comme « comme le montre la Fig. 3 » ne soit jamais renumérotée. La détection doit attendre la mise à jour de l'index, ce qui ne pose pas de problème ; les légendes définies par le menu ne sont pas concernées et prennent effet immédiatement.",
         "set.dead.title": "Références cassées", "set.dead.desc": "Une référence vers un bloc supprimé, ou vers un bloc dont la légende a été supprimée. Par défaut « ne rien faire » : la référence reste en place, et Ctrl+Alt+Z reconstruit le bloc supprimé avec son identifiant d'origine, ce qui rétablit la référence. « Marquer en rouge » la colore en rouge avec un texte barré, ce qui peut faire croire à un contenu endommagé. « Convertir en texte » est irréversible et attend 10 s avant d'agir.",
         "set.dead.off": "Ne rien faire (recommandé)", "set.dead.mark": "Marquer en rouge, garder la référence",
         "set.dead.text": "Convertir en texte rouge barré (irréversible)", "set.center.title": "Centrer les légendes",
@@ -616,6 +698,8 @@ const UI_TEXT = {
         "noun.image": "imagen", "noun.table": "tabla",
         "hint.table": "Leyendas: no disponible dentro de una celda de tabla — haz clic derecho sobre la tabla o sobre la leyenda situada encima", "hint.mixed": "Leyendas: selecciona bloques del mismo tipo (párrafos, o una sola imagen / una sola tabla)",
         "hint.math": "Leyendas: los bloques de ecuación se numeran automáticamente, no necesitan leyenda", "hint.default": "Leyendas: haz clic derecho sobre la imagen / tabla, o sobre el párrafo de leyenda debajo de una figura (encima de una tabla)",
+        "set.grp.single": "Documento único (general)",
+        "set.grp.book": "Libro / multipágina (ámbito)",
         "set.grp.num": "Numeración",
         "set.grp.trigger": "Disparadores y referencias",
         "set.grp.look": "Aspecto de las leyendas",
@@ -626,7 +710,6 @@ const UI_TEXT = {
         "set.labels.title": "Etiquetas de figura / tabla / ecuación", "set.labels.desc": "Texto que se escribe delante de cada número, p. ej. Fig. / Tab. / Ec.",
         "set.refs.title": "Actualizar referencias al renumerar", "set.refs.desc": "Reescribe cada ((id de bloque \"ancla antigua\")) con el nuevo número. Desactívalo para cambiar solo los números y dejar las referencias intactas.",
         "set.auto.title": "Renumeración automática", "set.auto.desc": "Renumera y actualiza las referencias 1,5 s después de dejar de escribir. Nunca escribe en el bloque donde está el cursor, así que no interrumpe la escritura.",
-        "set.detect.title": "Detectar leyendas por el texto", "set.detect.desc": "Un párrafo que empieza por Fig. 3 / Tabla 2 se considera una leyenda. Desactívalo para aceptar solo las leyendas definidas con el menú contextual (atributo custom-xref), de modo que una frase normal como «como muestra la Fig. 3» nunca se renumere. La detección debe esperar a que el índice se actualice, lo cual no es problema; las leyendas definidas desde el menú no se ven afectadas y surten efecto de inmediato.",
         "set.dead.title": "Referencias rotas", "set.dead.desc": "Una referencia que apunta a un bloque eliminado, o a un bloque cuya leyenda se ha quitado. Por defecto «no hacer nada»: la referencia se queda como está y Ctrl+Alt+Z reconstruye el bloque eliminado con su ID original, con lo que la referencia vuelve a conectar. «Marcar en rojo» la pinta en rojo con tachado, lo que se confunde fácilmente con contenido dañado. «Convertir en texto» es irreversible y espera 10 s antes de actuar.",
         "set.dead.off": "No hacer nada (recomendado)", "set.dead.mark": "Marcar en rojo, mantener la referencia",
         "set.dead.text": "Convertir en texto rojo tachado (irreversible)", "set.center.title": "Centrar leyendas",
@@ -685,6 +768,8 @@ const UI_TEXT = {
         "noun.image": "изображения", "noun.table": "таблицы",
         "hint.table": "Подписи: внутри ячейки таблицы недоступно — щёлкните правой кнопкой по самой таблице или по подписи над ней", "hint.mixed": "Подписи: выберите блоки одного типа (абзацы или одно изображение / одну таблицу)",
         "hint.math": "Подписи: блоки формул нумеруются автоматически, подпись не нужна", "hint.default": "Подписи: щёлкните правой кнопкой по изображению / таблице или по абзацу подписи под рисунком (над таблицей)",
+        "set.grp.single": "Один документ (общие)",
+        "set.grp.book": "Книга / несколько документов (диапазон)",
         "set.grp.num": "Нумерация",
         "set.grp.trigger": "Триггеры и ссылки",
         "set.grp.look": "Вид подписей",
@@ -695,7 +780,6 @@ const UI_TEXT = {
         "set.labels.title": "Метки рисунка / таблицы / формулы", "set.labels.desc": "Текст перед номером, например Рис. / Табл. / Форм.",
         "set.refs.title": "Обновлять ссылки при перенумерации", "set.refs.desc": "Переписывает каждую ((ID блока \"старый якорь\")) на новый номер. Выключите, чтобы менять только номера и не трогать ссылки.",
         "set.auto.title": "Автоматическая перенумерация", "set.auto.desc": "Перенумеровывает и обновляет ссылки через 1,5 с после остановки ввода. Блок с курсором никогда не изменяется, поэтому ввод не прерывается.",
-        "set.detect.title": "Распознавать подписи по тексту", "set.detect.desc": "Абзац, начинающийся с «Рис. 3 …» или «Табл. 2 …», считается подписью. Выключите, чтобы принимать только подписи, заданные через контекстное меню (атрибут custom-xref): тогда обычная фраза вроде «как видно из рис. 3» никогда не будет перенумерована. Распознавание ждёт обновления индекса, это нормально; подписи из меню от этого не зависят и срабатывают сразу.",
         "set.dead.title": "Битые ссылки", "set.dead.desc": "Ссылка на удалённый блок или на блок, у которого убрана подпись. По умолчанию «не трогать»: ссылка остаётся как есть, а Ctrl+Alt+Z восстанавливает удалённый блок с прежним ID, и ссылка снова работает. «Только пометить красным» рисует красный зачёркнутый текст, что легко принять за повреждение содержимого. «Превратить в текст» необратимо и ждёт 10 с перед выполнением.",
         "set.dead.off": "Не трогать (рекомендуется)", "set.dead.mark": "Пометить красным, ссылку сохранить",
         "set.dead.text": "Превратить в красный зачёркнутый текст (необратимо)", "set.center.title": "Выравнивать подписи по центру",
@@ -754,6 +838,8 @@ const UI_TEXT = {
         "noun.image": "imagem", "noun.table": "tabela",
         "hint.table": "Legendas: não disponível dentro de uma célula de tabela — clique com o botão direito na própria tabela ou na legenda acima dela", "hint.mixed": "Legendas: selecione blocos do mesmo tipo (parágrafos, ou uma única imagem / uma única tabela)",
         "hint.math": "Legendas: blocos de equação são numerados automaticamente, não precisam de legenda", "hint.default": "Legendas: clique com o botão direito na imagem / tabela, ou no parágrafo de legenda abaixo de uma figura (acima de uma tabela)",
+        "set.grp.single": "Documento único (geral)",
+        "set.grp.book": "Livro / vários documentos (escopo)",
         "set.grp.num": "Numeração",
         "set.grp.trigger": "Gatilhos e referências",
         "set.grp.look": "Aparência das legendas",
@@ -764,7 +850,6 @@ const UI_TEXT = {
         "set.labels.title": "Rótulos de figura / tabela / equação", "set.labels.desc": "Texto colocado antes de cada número, por exemplo Fig. / Tab. / Eq.",
         "set.refs.title": "Atualizar referências ao renumerar", "set.refs.desc": "Reescreve cada ((id do bloco \"âncora antiga\")) com o novo número. Desative para mudar apenas os números e deixar as referências intactas.",
         "set.auto.title": "Renumeração automática", "set.auto.desc": "Renumera e atualiza as referências 1,5 s depois de parar de digitar. Nunca grava no bloco em que está o cursor, então a digitação não é interrompida.",
-        "set.detect.title": "Detectar legendas pelo texto", "set.detect.desc": "Um parágrafo que começa com Fig. 3 / Tabela 2 é tratado como legenda. Desative para aceitar apenas legendas definidas pelo menu de contexto (atributo custom-xref), assim uma frase comum como \"como mostra a Fig. 3\" nunca é renumerada. A detecção precisa esperar o índice atualizar, o que não é problema; legendas definidas pelo menu não são afetadas e valem na hora.",
         "set.dead.title": "Referências quebradas", "set.dead.desc": "Uma referência que aponta para um bloco excluído ou para um bloco cuja legenda foi removida. O padrão \"não fazer nada\": a referência fica como está e Ctrl+Alt+Z reconstrói o bloco excluído com o ID original, religando a referência. \"Marcar em vermelho\" pinta de vermelho com tachado, o que é fácil de confundir com conteúdo danificado. \"Converter em texto\" é irreversível e espera 10 s antes de agir.",
         "set.dead.off": "Não fazer nada (recomendado)", "set.dead.mark": "Marcar em vermelho, manter a referência",
         "set.dead.text": "Converter em texto vermelho tachado (irreversível)", "set.center.title": "Centralizar legendas",
@@ -866,7 +951,6 @@ const DEFAULTS = {
     refreshRefs: true,
     autoMode: true,     // 写完停手 autoDelay 毫秒后自动重排
     autoDelay: 1500,
-    textDetect: true,   // 靠正文前缀「图 3 …」自动认题注；关掉后只认 custom-xref 属性（右键设的）
     // 指向已删块的引用怎么处理：off 不看不标记（默认）| mark 只标红保留引用 | text 转成红色删除线文本
     // 1.0.2 起默认改成 off：标红是运行时加的 class，思源一重渲染就掉、下一轮又加回来，
     // 用户看到「红字+删除线」只会以为是插件把内容改坏了（2026-10-31 用户两次反馈）。
@@ -882,6 +966,33 @@ const DEFAULTS = {
     debug: false,       // 诊断模式：装 fetch 探针 + 写 ws-log.json。默认关，别长期开着
     keyInsert: "Ctrl+Alt+R",   // 插入交叉引用
     keyRenumber: "Ctrl+Alt+N", // 重排图表编号
+
+    /* v1.1.0 多文档范围重排。默认全关：不启用时本插件行为与 1.0.11 逐字节一致。
+     * 范围来源可切（docnum=跟随子文档编号插件 / custom=本插件自己的 targets+excluded）；
+     * 编号口径可切（continuous 全书连号 / bydoc 按文档前缀）；引用只刷范围内。 */
+    scopeEnabled: false,
+    scopeSource: "docnum",
+    scopeMode: "continuous",
+    scopeAutoEvents: true,
+    scopeTargets: [],
+    scopeExcluded: [],
+    /* v1.1.8：交叉引用窗口按当前第 N 级章节自动收窄（层级由 scopePrefixLevel 决定）。
+     * 只收窄窗口列表，不改范围重排的范围；关掉则列出全范围题注。 */
+    scopePickerAuto: true,
+    scopeConcurrency: 20,
+    scopeMaxDocs: 500,
+    /* v1.1.6：bydoc 前缀取 rootNum 的第几级（1-based）；0 = 整条链。
+     * 用户口径：rootNum "2.1.2.3" 取第 2 级 → "1" → 图 1-1。 */
+    scopePrefixLevel: 2,
+    /* v1.2.0：按编号插件范围配置覆盖层级。键 = targets[].id（即 meta.targetId），
+     * 值 = 该范围取第几级；未列出的范围用 scopePrefixLevel。 */
+    scopePrefixLevelByTarget: {},
+    /* v1.2.9：插入面板红框内三个筛选控件的状态，跨次打开保留。
+     * pickerLevel=-1 表示「没存过，走默认」；0 是合法值（跨所有笔记本）。
+     * 搜索框不存（红框外）：每次打开都该是空的，免得上次搜的词挡住列表。 */
+    pickerType: "",
+    pickerLevel: -1,
+    pickerSec: "",
 };
 
 /**
@@ -1090,6 +1201,28 @@ async function logErr(where, e) {
 
 const ID_KEYS = ["id", "parentID", "previousID", "nextID"];
 
+/* v1.2.13 加速：applyPlan 期间把逐块写入排队，最后一次批量提交。
+   getBlockDOM 命中「已排队」的块时返回目标 DOM，保证撤销记账拿到写入后的值。 */
+let XR_BATCH = null;
+
+async function flushBlockBatch(batch) {
+    if (!batch || !batch.blocks.length) return;
+    const saved = XR_BATCH;
+    XR_BATCH = null;                       // 防回退写入被自己再次拦截
+    try {
+        try {
+            await retry(() => api("/api/block/batchUpdateBlock", { blocks: batch.blocks }));
+            return;
+        } catch (e) { await logErr("batchUpdateBlock", e); }
+        // 批量失败自动回退逐条，保证最终一致
+        for (const b of batch.blocks) {
+            try { await retry(() => api("/api/block/updateBlock",
+                { id: b.id, dataType: b.dataType, data: b.data })); }
+            catch (e) { await logErr("batchUpdateBlock/fallback", e); }
+        }
+    } finally { XR_BATCH = saved; }
+}
+
 async function api(path, payload) {
     const pl = payload || {};
     // 关键：id 为 null/空时内核会直接弹「Field [id] must not be null」，先拦住，换成能定位的本地错误
@@ -1099,6 +1232,19 @@ async function api(path, payload) {
             e.__local = true;
             await logErr(path, e);
             throw e;
+        }
+    }
+    if (XR_BATCH) {
+        if (path === "/api/block/updateBlock") {
+            XR_BATCH.blocks.push({ id: pl.id, dataType: pl.dataType, data: pl.data });
+            XR_BATCH.pending.set(pl.id, pl.data);
+            callNote(path + "[queued]", { id: pl.id });
+            return null;
+        }
+        if (path === "/api/block/getBlockDOM") {
+            if (XR_BATCH.pending.has(pl.id)) return { dom: XR_BATCH.pending.get(pl.id) };
+            if (XR_BATCH.doms && XR_BATCH.doms[pl.id] !== undefined)
+                return { dom: XR_BATCH.doms[pl.id] };
         }
     }
     callNote(path, pl);
@@ -1149,8 +1295,17 @@ async function isBlockAlive(id) {
     }
 }
 
-/** 批量核实存活：小并发跑，避免一条一条串行等（跨文档引用多时差别明显） */async function aliveMap(ids) {
+/** 批量核实存活：一次 checkBlocksExist；接口异常时回退原来的逐个实时判据。 */
+async function aliveMap(ids) {
     const out = {};
+    if (!ids || !ids.length) return out;
+    try {
+        const r = await api("/api/block/checkBlocksExist", { ids: ids });
+        if (r && typeof r === "object") {
+            ids.forEach((id) => { out[id] = (r[id] === true) ? true : (r[id] === false ? false : null); });
+            return out;
+        }
+    } catch (e) { await logErr("aliveMap/batch", e); }
     const CONC = 8;
     for (let i = 0; i < ids.length; i += CONC) {
         const batch = ids.slice(i, i + CONC);
@@ -1214,7 +1369,7 @@ const escRe = (x) => String(x).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** 段首编号前缀。式子不参与（公式块按 type==="m" 判，段首写「式 1」不该被当题注） */
 const NUM_HEAD = new RegExp(
-    "^\\s*(" + FIG_WORDS.concat(TAB_WORDS).map(escRe).join("|") + ")\\.?\\s*(\\d+(?:[-.]\\d+)?)\\s*");
+    "^\\s*(" + FIG_WORDS.concat(TAB_WORDS).map(escRe).join("|") + ")\\.?\\s*(\\d+(?:[-.]\\d+)*)\\s*");
 
 /** 前缀词 → fig / tab；不在表里返回 null */
 function prefixKind(word) {
@@ -1223,11 +1378,8 @@ function prefixKind(word) {
     return null;
 }
 
-/** 归类：custom-xref 属性优先；公式块=m→eq；段落前缀 图/表→fig/tab
- *
- * opt.textDetect === false 时不认「图 3 xxx」这种正文前缀（设置里可关），
- * 只认 custom-xref 属性 —— 手写正文里偶尔提到「图 3」的普通段落就不会被误当题注。
- */
+/** 归类：只认 custom-xref 属性与公式块（m）。
+ *  v1.2.2 起不再按正文前缀「图 3 …」猜题注（原「文字自动识别」功能已删除）。 */
 function classify(b, opt) {
     // 调用方点名强制归类（快通道用）：值是 fig/tab/eq，或 "" 表示「明确不是题注」。
     // 后者不能省 —— 取消题注时属性已清、正文前缀刚被剥，但 blocks 表里两样都还是旧的，
@@ -1239,10 +1391,7 @@ function classify(b, opt) {
     const m = /custom-xref="([^"]*)"/.exec(b.ial || "");
     if (m && ["fig", "tab", "eq"].indexOf(m[1]) >= 0) return m[1];
     if (b.type === "m") return "eq";
-    if (opt && opt.textDetect === false) return null;
-    const p = NUM_HEAD.exec((b.markdown || "").trim());
-    if (p) return prefixKind(p[1]);
-    return null;
+    return null;   // v1.2.2：只认属性 / 公式块，不再按正文前缀猜测
 }
 
 /**
@@ -1759,7 +1908,7 @@ function filterPickerRows(rows, opt) {
         if (!x) return false;
         if (kind && x.kind !== kind) return false;
         if (sec && ("/" + (x.hPath || "") + "/").indexOf("/" + sec + "/") < 0) return false;
-        if (q && (x.name + " " + x.oldMd).toLowerCase().indexOf(q) < 0) return false;
+        if (q && (x.name + " " + (x.oldMd || "") + " " + (x.docTitle || "")).toLowerCase().indexOf(q) < 0) return false;
         return true;
     });
 }
@@ -1824,7 +1973,13 @@ function buildPlan(blocks, s, deadSet, exclSet) {
         const kind = classify(b, s);
         if (!kind) continue;
         counters[kind] += 1;
-        const seq = s.mode === "chapter" ? chapter + "-" + counters[kind] : String(counters[kind]);
+        /* v1.1.4：范围功能开启且本文档有章节号时，单文档轮也用章节号前缀；
+         * v1.1.6：层级不够时 __scopeNoPrefix，只留连续序号。 */
+        const seq = s.__scopeNoPrefix
+            ? String(counters[kind])
+            : (s.__scopePrefix
+                ? s.__scopePrefix + "-" + counters[kind]
+                : (s.mode === "chapter" ? chapter + "-" + counters[kind] : String(counters[kind])));
         const label = labelOf[kind];
         const name = label + " " + seq;
         const body = stripNumber(kind, b.markdown || "");
@@ -1886,6 +2041,513 @@ function buildPlan(blocks, s, deadSet, exclSet) {
         }
     }
     return { plan: plan, refs: refs, deadRefs: deadRefs, sections: sections };
+}
+
+/* ==================== v1.1.0 多文档范围重排 ====================
+ * ① 现有 renumber()/buildPlan() 一行不改，单文档自动重排行为与 1.0.11 完全一致；
+ * ② 范围轮只在 scopeEnabled=true 时被显式命令或结构事件触发；
+ * ③ 任一文档采集失败 → 整批抛错、一个字都不写（避免半本新号半本旧号）；
+ * ④ 引用只刷范围内：anchor 只收范围内题注，引用块只取范围内文档；
+ * ⑤ 静态引用恒为 ((id "锚文本"))，插入 DOM 恒为 data-subtype="s"。
+ */
+
+const XR_REF_RE = /\(\((\d{14}-[0-9a-z]{7})\s+(["'])(.*?)\2\)\)/g;
+const XR_SCOPE_CMDS = {
+    create: 1, removeDoc: 1, removeDocByID: 1, rename: 1,
+    filetreeSortChanged: 1, moveDoc: 1, moveDocs: 1, refreshFiletree: 1,
+};
+
+/** 有上限并发；结果按输入下标归位，顺序不依赖响应先后。 */
+async function xrMapLimit(items, limit, worker) {
+    const out = new Array(items.length);
+    let cursor = 0;
+    const n = Math.max(1, Math.min(limit || 1, items.length || 1));
+    async function runner() {
+        for (;;) {
+            const i = cursor++;
+            if (i >= items.length) return;
+            out[i] = await worker(items[i], i);
+        }
+    }
+    const runners = [];
+    for (let i = 0; i < n; i++) runners.push(runner());
+    await Promise.all(runners);
+    return out;
+}
+
+/** 纯函数：范围来源解析。docnum 优先；编号插件不在时降级到 custom 并标记 degraded。 */
+function xrScopeResolve(settings, dnCfg) {
+    const s = settings || {};
+    const custom = () => ({
+        source: "custom",
+        targets: Array.isArray(s.scopeTargets) ? s.scopeTargets : [],
+        excluded: Array.isArray(s.scopeExcluded) ? s.scopeExcluded : [],
+        degraded: false,
+    });
+    if (s.scopeSource === "custom") return custom();
+    if (dnCfg && Array.isArray(dnCfg.targets)) {
+        return {
+            source: "docnum",
+            targets: dnCfg.targets,
+            excluded: Array.isArray(dnCfg.excluded) ? dnCfg.excluded : [],
+            degraded: false,
+        };
+    }
+    const c = custom();
+    c.degraded = true;
+    return c;
+}
+
+/** 纯函数 v1.2.5：窗口默认收窄层级 = 编号前缀层级 - 1。
+ *  编号按第 n 级显示，引用范围按第 n-1 级父链，同父级下的兄弟章节即可互相引用。
+ *  n<=0（完整链）时仍为 0 = 不收窄。 */
+function xrPickerLevel(level) {
+    const n = Number(level) || 0;
+    return n <= 0 ? 0 : Math.max(1, n - 1);
+}
+function xrPickerOverrides(overrides) {
+    const out = {};
+    Object.keys(overrides || {}).forEach((k) => { out[k] = xrPickerLevel(overrides[k]); });
+    return out;
+}
+
+/** 纯函数 v1.2.0：该文档用第几级 —— 按 meta.targetId 查覆盖表，没有则用全局层级。 */
+function xrLevelForDoc(doc, globalLevel, overrides) {
+    const m = doc && doc.meta;
+    const tid = m && m.targetId;
+    if (tid && overrides && Object.prototype.hasOwnProperty.call(overrides, String(tid))) {
+        const v = Number(overrides[String(tid)]);
+        if (Number.isFinite(v) && v >= 0) return Math.floor(v);
+    }
+    const g = Number(globalLevel);
+    return Number.isFinite(g) && g >= 0 ? Math.floor(g) : 0;
+}
+
+/** 纯函数：取 rootNum 的前 N 级链（当前第 N 级文档）。
+ *  level<=0 / 数据无效 / 层级不够 → 空串 = 不收窄。 */
+function xrLevelChain(rootNum, level) {
+    const s = String(rootNum || "");
+    const n = Number(level) || 0;
+    if (n <= 0 || !/^\d+(?:\.\d+)*$/.test(s)) return "";
+    const parts = s.split(".");
+    if (parts.length < n) return "";
+    return parts.slice(0, n).join(".");
+}
+
+/** 纯函数：章节范围键 = rootID | 前 N 级链（v1.1.9）。
+ *  不同范围根（笔记本 / 顶级文档）的编号各自从 1 开始，只比链会把两棵树的
+ *  `1.2.3` 混成同一章节，窗口因此混入别的章节的题注。 */
+function xrChainKeyFromMeta(meta, level) {
+    const chain = xrLevelChain(meta && meta.rootNum, level);
+    if (!chain) return "";
+    return String((meta && meta.rootID) || "") + "|" + chain;
+}
+function xrDocChainKey(doc, level) {
+    return xrChainKeyFromMeta(doc && doc.meta, level);
+}
+
+/** 纯函数：只保留属于同一第 N 级链、且同一范围根的文档（该级文档自身 + 全部后代）。
+ *  key 由 xrChainKeyFromMeta 生成；为空 = 不收窄。 */
+function xrDocsInChain(docs, key, level, overrides) {
+    if (!key) return (docs || []).slice();
+    return (docs || []).filter((d) =>
+        xrDocChainKey(d, xrLevelForDoc(d, level, overrides)) === key);
+}
+
+/** v1.2.8：窗口「范围层级」过滤。
+ *  文档属性 custom-doc-num-meta 已带 rootID / rootNum / targetId，
+ *  范围键 = rootID | rootNum 前 L 段；不同范围根（笔记本 / top 目录）天然隔离。
+ *  curKey 为空（当前文档无编号、或层级不够）→ 返回空数组，绝不回退「全部范围」。
+ *  v1.2.9：L=0 = 跨所有笔记本（全范围），用户主动选的最宽一档。 */
+function xrPickerRowsInLevel(rows, curKey, level) {
+    if (Number(level) <= 0) return (rows || []).slice();
+    if (!curKey) return [];
+    return (rows || []).filter((x) =>
+        xrChainKeyFromMeta(x && x.docMeta, level) === curKey);
+}
+/** v1.2.9：窗口可选层级 = 0..章节前缀层级。
+ *  0 级 = 跨所有笔记本；1 级 = 可跨篇（同 top 目录）；
+ *  n-1 级（默认）= 可跨章（同篇）；n 级 = 只本章。 */
+function xrPickerLevelList(prefixLevel) {
+    const n = Math.max(1, Number(prefixLevel) || 1);
+    const out = [0];
+    for (let L = 1; L <= n; L++) out.push(L);
+    return out;
+}
+function xrPickerDefaultLevel(prefixLevel, autoOn) {
+    const list = xrPickerLevelList(prefixLevel);
+    const n = list[list.length - 1] || 1;
+    return autoOn === false ? n : Math.max(1, n - 1);
+}
+/** v1.2.9：记住的层级要落在当前可选列表里，否则回退默认。
+ *  saved 用 -1 表示「没存过」。0 是合法值，不能用 || 判断。 */
+function xrPickerSavedLevel(saved, list, fallback) {
+    const v = Number(saved);
+    if (Number.isFinite(v) && v >= 0 && list.indexOf(v) >= 0) return v;
+    return Number(fallback) || 0;
+}
+/** v1.2.9：记住的章节筛选只在本次面板真的存在时才恢复。 */
+function xrPickerSavedSec(saved, secIds) {
+    const s = String(saved || "");
+    if (!s) return "";
+    return secIds && secIds.indexOf(s) >= 0 ? s : "";
+}
+
+/** v1.2.11：当前层级一条题注都没有时，从当前档往「更宽」的档逐级试探，
+ *  返回第一个真的有题注的层级。级数越小范围越大（3 本章 → 2 跨章 → 1 跨篇）。
+ *  典型场景：文档 rootNum 只有 2 段（"1.1"），却记住了第 3 级 → 链键算不出 →
+ *  旧版直接弹 toast 不建窗口；升到第 2 级就能看到本文档的「图 1-1」。
+ *  默认 **不自动进 0 级**（跨所有笔记本必须用户主动选，避免偷偷跨笔记本）。
+ *  allowZero=true 时才把 0 级也纳入自动试探。
+ *  返回 {level, found}：全空时 found=false，level 停在可自动到达的最宽一档。 */
+function xrPickerFirstNonEmptyLevel(rows, keys, list, start, allowZero) {
+    const arr = (list || []).map(Number)
+        .filter((L) => Number.isFinite(L) && L >= 0).sort((a, b) => a - b);
+    if (!arr.length) return { level: 0, found: false };
+    let s = Number(start);
+    if (arr.indexOf(s) < 0) s = arr[arr.length - 1];
+    // 从当前档开始，按级数递减（范围变宽）逐个试；s=0 是用户主动选的，原样保留
+    const cand = arr.filter((L) => L <= s && (allowZero === true || L > 0 || s === 0))
+        .reverse();
+    if (!cand.length) cand.push(s);
+    let last = cand[0];
+    for (const L of cand) {
+        last = L;
+        const key = keys && typeof keys.get === "function" ? (keys.get(L) || "") : "";
+        if (xrPickerRowsInLevel(rows, key, L).length) return { level: L, found: true };
+    }
+    return { level: last, found: false };
+}
+
+
+/** 纯函数：从 rootNum 取指定层级的前缀。
+ *  level<=0 → 整条链（v1.1.5 行为）；level=N → 第 N 段；
+ *  层级不够深（"1.2.3" 选第 4 级）→ 返回空串 = 不显示层级前缀。
+ *  例 "2.1.2.3" level=2 → "1"。 */
+function xrScopePrefix(rootNum, level) {
+    const s = String(rootNum || "");
+    if (!/^\d+(?:\.\d+)*$/.test(s)) return "";
+    const parts = s.split(".");
+    const n = Number(level) || 0;
+    if (n <= 0) return s;
+    if (n > parts.length) return "";
+    return parts[n - 1];
+}
+
+/** 纯函数：按文档前缀口径取章节号。
+ *  有 meta 时按 scopePrefixLevel 取一段（取不到 = 空串，不显示前缀）；
+ *  完全没有 meta 时回退范围内文档树序号。 */
+function xrScopeDocTag(doc, index, mode, level) {
+    const m = doc && doc.meta;
+    if (mode === "bydoc" && m && m.rootNum) return xrScopePrefix(m.rootNum, level);
+    return String(index + 1);
+}
+
+/** 纯函数：全局 anchor（范围内全部题注 id → 新锚文本）。 */
+function xrScopeAnchor(plan) {
+    const a = {};
+    for (const p of (plan || [])) a[p.id] = p.name;
+    return a;
+}
+
+/** 纯函数：只刷范围内引用。返回 [{id,next,old,docId}]；范围外引用一个字都不动。 */
+function xrScopeRefs(allBlocks, anchor) {
+    const refs = [];
+    const RE = new RegExp(XR_REF_RE.source, "g");
+    for (const b of (allBlocks || [])) {
+        const md = b.markdown || "";
+        if (md.indexOf("((") < 0) continue;
+        let changed = false;
+        const anchors = {};
+        RE.lastIndex = 0;
+        const next = md.replace(RE, (whole, bid, q, old) => {
+            if (!anchor[bid]) return whole;
+            if (q === '"' && anchor[bid] === old) return whole;
+            changed = true;
+            anchors[bid] = anchor[bid];   // v1.1.2：给 DOM 直改路径用
+            return "((" + bid + ' "' + anchor[bid] + '"))';
+        });
+        if (changed) refs.push({ id: b.id, next: next, old: md.slice(0, 60),
+            docId: b.docId, anchors: anchors });
+    }
+    return refs;
+}
+
+/** 纯函数：结构事件是否该触发范围轮。判不准（无 box / doc 范围缺 box）一律全量。 */
+function xrScopeShouldRun(cfg, cmd, data) {
+    if (!XR_SCOPE_CMDS[cmd]) return false;
+    const ts = (cfg && cfg.targets) || [];
+    if (!ts.length) return false;
+    if (ts.some((t) => t && (t.type || "doc") === "doc" && !t.box)) return true;
+    const d = data || {};
+    let box = "";
+    if (cmd === "filetreeSortChanged") box = String(d.notebook || "");
+    else if (cmd === "create") box = String((d.box && d.box.id) || "");
+    else if (cmd === "rename") box = typeof d.box === "string" ? d.box : String((d.box && d.box.id) || "");
+    else return true;
+    if (!box) return true;
+    return ts.some((t) => t && (t.type === "notebook" ? String(t.id) === box : String(t.box || "") === box));
+}
+
+/** SQL 的 blocks.ial 把 JSON 存成 HTML 实体（&#123; / &quot; / &#125;），读回来要反转义。 */
+function xrDecodeIalText(s) {
+    return String(s == null ? "" : s)
+        .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+        .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+        .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+/** 纯函数：从 ial 解析 custom-doc-num-meta；缺失 / 坏值返回 null。 */
+function xrParseMeta(ial) {
+    const m = /custom-doc-num-meta="([^"]*)"/.exec(String(ial || ""));
+    if (!m) return null;
+    try {
+        const o = JSON.parse(xrDecodeIalText(m[1]));
+        return o && typeof o === "object" ? o : null;
+    } catch (e) { return null; }
+}
+/** 一次 SQL（按 root_id 分批，避免 IN 过长）拿范围内插件真正会用到的块，含文档块自身的 ial。
+ *  v1.2.15：实测 40 篇文档，全量 1013 块/29ms → 过滤后 257 块/7.5ms。
+ *  只取题注(custom-xref)、公式(m)、标题(h)、含引用的块；异常或空结果退回全量。 */
+async function xrScopeSqlBlocks(ids, batch) {
+    const n = batch || 40;
+    const out = [];
+    for (let k = 0; k < ids.length; k += n) {
+        const ch = ids.slice(k, k + n);
+        const inl = ch.map((id) => "'" + String(id).replace(/'/g, "''") + "'").join(",");
+        const base = "SELECT id, root_id, type, subtype, parent_id, markdown, ial, sort "
+            + "FROM blocks WHERE root_id IN (" + inl + ") ";
+        let rs;
+        try {
+            rs = await sql(base + "AND (ial LIKE '%custom-xref%' OR type = 'm' OR type = 'h' "
+                + "OR markdown LIKE '%((%') LIMIT -1");
+        } catch (e) { await logErr("xrScopeSqlBlocks/filter", e); }
+        if (!rs || !rs.length) {
+            rs = await sql(base + "LIMIT -1");
+        }
+        (rs || []).forEach((r) => out.push(r));
+    }
+    return out;
+}
+
+/** v1.1.2：内核的文档块顺序接口，只返回块 id 数组，不拉整篇 HTML。
+ *  实测 3/3 篇与 getDoc 的 DOM 顺序完全一致（blocks.sort 判错的两篇也一致）。 */
+async function orderFromDocOrders(docId) {
+    const r = await api("/api/block/getDocBlocksOrders", { id: docId });
+    const d = r && r.data;
+    if (!Array.isArray(d)) throw new Error("getDocBlocksOrders 未返回数组");
+    return d.filter((x) => typeof x === "string" && x);
+}
+
+/** v1.1.2：只改引用节点的锚文本，不经过 Lute 重建块。
+ *  updateContent 的 hasRefNode 防呆会在「Lute 把 ((id "锚")) 当字面文本」时跳过写入，
+ *  导致引用永远刷不过来。这里直接改 DOM 里 [data-type="block-ref"] 的 textContent，
+ *  data-id / data-subtype="s" 等结构属性一个都不动。 */
+async function updateRefAnchors(id, anchors, rec) {
+    if (typeof DOMParser === "undefined") return false;
+    const cur = await api("/api/block/getBlockDOM", { id: id });
+    const dom = cur && cur.dom;
+    if (!dom) return false;
+    const doc = new DOMParser().parseFromString(dom, "text/html");
+    let changed = false;
+    doc.querySelectorAll('[data-type="block-ref"]').forEach((el) => {
+        const bid = el.getAttribute("data-id") || "";
+        const want = anchors && anchors[bid];
+        if (!want) return;
+        if ((el.textContent || "").trim() !== want) {
+            el.textContent = want;
+            changed = true;
+        }
+    });
+    if (!changed) return true;
+    const root = doc.body.firstElementChild;
+    const next = root ? root.outerHTML : "";
+    if (!next) return false;
+    await retry(() => api("/api/block/updateBlock", { id: id, dataType: "dom", data: next }));
+    if (rec) rec.items.push({ id: id, before: dom, after: next });
+    return true;
+}
+
+/** 纯函数：决定本轮哪些文档要重扫、哪些直接复用缓存。
+ *  dirty=null 表示全量；文档级事件（cache 命中且未标脏）不重扫；
+ *  新加入的文档（cache 里没有）必须采一次。 */
+function xrScopePickNeed(docs, cache, dirty) {
+    const need = [];
+    const reuse = new Map();
+    (docs || []).forEach((d) => {
+        const hit = cache && cache.get(d.id);
+        const isDirty = !dirty || dirty.has(d.id);
+        if (!isDirty && hit) reuse.set(d.id, hit.blocks);
+        else need.push(d);
+    });
+    return { need: need, reuse: reuse };
+}
+
+/**
+ * 范围轮采集：一次 SQL 拿范围内全部块内容 + 并发 getDocBlocksOrders 拿文档内真实顺序。
+ * blocks.sort 实测不等于 DOM 顺序（3 篇里 2 篇题注顺序错），不能拿来编号；
+ * 但块内容可以一次 SQL 取回，不必逐篇再查 SQL。
+ * 任一文档顺序读取失败 → 整批抛错，调用方整批不写。
+ */
+async function xrScopeCollectDocs(docs, opt) {
+    const o = opt || {};
+    const cache = o.cache || null;
+    const dirty = o.dirty instanceof Set ? o.dirty : null;   // null = 全量重扫
+    /* v1.1.2 增量：文档级结构事件（拖动 / 删除 / 新建 / 改名）不改文档内部块顺序，
+     * 未标脏的文档直接复用上次缓存；只有文档内插/删/改标题才需要重扫那一篇。 */
+    const picked = xrScopePickNeed(docs, cache, dirty);
+    const need = picked.need;
+    const reuse = picked.reuse;
+    const rows = need.length
+        ? await xrScopeSqlBlocks(need.map((d) => d.id), o.sqlBatch || 40)
+        : [];
+    const byDoc = new Map();
+    const metaOf = new Map();
+    rows.forEach((r) => {
+        if (r.type === "d") { metaOf.set(r.id, xrParseMeta(r.ial)); return; }
+        if (!byDoc.has(r.root_id)) byDoc.set(r.root_id, []);
+        byDoc.get(r.root_id).push(r);
+    });
+    // 自定义范围来源没有 meta：从同一次 SQL 的文档块 ial 回填，零额外请求
+    docs.forEach((d) => { if (!d.meta && metaOf.has(d.id)) d.meta = metaOf.get(d.id); });
+    const errors = [];
+    const fresh = new Map();
+    await xrMapLimit(need, o.concurrency || 20, async (d) => {
+        try {
+            let order = [];
+            try { order = await orderFromDocOrders(d.id); }   // 内核顺序接口，响应最轻
+            catch (e) { order = await orderFromDoc(d.id); }   // 旧内核回退 getDoc
+            const list = byDoc.get(d.id) || [];
+            const map = new Map(list.map((b) => [b.id, b]));
+            const blocks = [];
+            const got = new Set();
+            for (const id of order) {
+                const b = map.get(id);
+                if (b && !got.has(id)) { got.add(id); blocks.push(b); }
+            }
+            for (const b of list) {
+                if (!got.has(b.id)) { got.add(b.id); b.stale = true; blocks.push(b); }
+            }
+            blocks.forEach((b) => { b.docId = d.id; });
+            fresh.set(d.id, { doc: d, blocks: blocks });
+        } catch (e) {
+            errors.push(d.id + "：" + ((e && e.message) || e));
+        }
+    });
+    if (errors.length) {
+        throw new Error("范围采集失败 " + errors.length + " 篇：" + errors.slice(0, 3).join("；"));
+    }
+    const result = docs.map((d) => {
+        if (reuse.has(d.id)) return { doc: d, blocks: reuse.get(d.id) };
+        return fresh.get(d.id) || { doc: d, blocks: [] };
+    });
+    result.rescanned = need.length;   // 供范围轮统计「实际重扫了几篇」
+    return result;
+}
+
+/** 按文档分段生成范围计划；复用 classify / stripNumber / captionBgOf，结构与 buildPlan 一致。 */
+function xrBuildScopePlan(perDoc, settings, mode) {
+    const s = settings || {};
+    const labelOf = { fig: s.figLabel || tr("label.fig"), tab: s.tabLabel || tr("label.tab"),
+        eq: s.eqLabel || tr("label.eq") };
+    const counters = { fig: 0, tab: 0, eq: 0 };
+    const plan = [];
+    const sections = [];
+    const allBlocks = [];
+    (perDoc || []).forEach((pd, di) => {
+        const local = { fig: 0, tab: 0, eq: 0 };
+        const hStack = [];
+        const docTag = xrScopeDocTag(pd.doc, di, mode,
+            xrLevelForDoc(pd.doc, s.scopePrefixLevel, s.scopePrefixLevelByTarget));
+        for (const b of (pd.blocks || [])) {
+            b.docId = pd.doc.id;
+            allBlocks.push(b);
+            if (b.type === "h" && b.subtype) {
+                const lv = parseInt(String(b.subtype).slice(1), 10) || 1;
+                while (hStack.length && hStack[hStack.length - 1].lv >= lv) hStack.pop();
+                hStack.push({ id: b.id, lv: lv, text: headingText(b.markdown) });
+                sections.push({ id: b.id, lv: lv, text: headingText(b.markdown), docId: pd.doc.id,
+                    path: hStack.map((x) => x.id).join("/") });
+                continue;
+            }
+            const kind = classify(b, s);
+            if (!kind) continue;
+            counters[kind] += 1;
+            local[kind] += 1;
+            // v1.1.6：选的层级超出实际层数 → docTag 为空 → 不显示层级前缀，只留连续序号
+            const seq = mode === "bydoc"
+                ? (docTag ? docTag + "-" + local[kind] : String(counters[kind]))
+                : String(counters[kind]);
+            const name = labelOf[kind] + " " + seq;
+            const body = stripNumber(kind, b.markdown || "");
+            const flat = String(body).replace(/[\s{}]/g, "").split(String.fromCharCode(92)).join("");
+            const emptyEq = kind === "eq" && !flat;
+            // eq 走 applyPlan 的 updateMathTag(p.seq)，不需要 newMd；t 块同样只改属性。
+            // 只有编号没有正文时不补尾随空格——思源存盘会吃掉它，否则每轮都判「要改」。
+            const newMd = (kind === "eq" || b.type === "t") ? null
+                : (body ? name + " " + body : name);
+            // tagOk：当前 \tag 已是目标号，dryRun / 写回都不必再算这一项（避免恒报「要改」）
+            const tagOk = kind === "eq" && String(b.markdown || "").indexOf("tag{" + seq + "}") >= 0;
+            const top = hStack.length ? hStack[hStack.length - 1] : null;
+            plan.push({ id: b.id, docId: pd.doc.id, type: b.type, kind: kind, seq: seq,
+                name: name, newMd: newMd, emptyEq: emptyEq, tagOk: tagOk,
+                oldMd: (b.markdown || "").slice(0, 60), curMd: b.markdown || "", ial: b.ial || "",
+                hPath: hStack.map((x) => x.id).join("/"), hLv: top ? top.lv : 0,
+                hText: top ? top.text : "",
+                center: s.centerCaption !== false && (kind === "fig" || kind === "tab"),
+                bg: (kind === "fig" || kind === "tab") ? captionBgOf(s) : "" });
+        }
+    });
+    return { plan: plan, sections: sections, allBlocks: allBlocks };
+}
+
+/** SQL 字符串转义（范围里都是思源自己给的 id / box / path，仍需防单引号）。 */
+function xrSqlEsc(s) {
+    return String(s == null ? "" : s).replace(/'/g, "''");
+}
+
+/** 自定义范围 → 有序文档清单。doc 范围含全部子文档（path 前缀），notebook 范围含整本。
+ *  顺序按 (box, path)：不保证等于文档树拖拽顺序，要精确顺序请用「跟随子文档编号插件」来源。 */
+async function xrScopeDocsCustom(cfg) {
+    const ids = new Map();
+    for (const t of ((cfg && cfg.targets) || [])) {
+        if (!t || !t.id) continue;
+        let rows = [];
+        if ((t.type || "doc") === "notebook") {
+            rows = (await sql("SELECT id, box, path, content FROM blocks WHERE type='d' AND box='"
+                + xrSqlEsc(t.id) + "' LIMIT 3000")) || [];
+        } else {
+            const one = (await sql("SELECT id, box, path, content FROM blocks WHERE id='"
+                + xrSqlEsc(t.id) + "' LIMIT 1")) || [];
+            if (one.length) {
+                rows = rows.concat(one);
+                const base = xrSqlEsc(String(one[0].path || "").replace(/\.sy$/, ""));
+                rows = rows.concat((await sql("SELECT id, box, path, content FROM blocks WHERE type='d' AND box='"
+                    + xrSqlEsc(one[0].box) + "' AND path LIKE '" + base + "/%' LIMIT 3000")) || []);
+            }
+        }
+        rows.forEach((r) => {
+            if (!r || !r.id || ids.has(r.id)) return;
+            ids.set(r.id, { id: r.id, box: r.box, path: r.path, title: r.content || "", num: "", pad: 0 });
+        });
+    }
+    const drop = new Set();
+    for (const e of ((cfg && cfg.excluded) || [])) {
+        if (!e || !e.id) continue;
+        drop.add(e.id);
+        if (e.mode !== "subtree") continue;
+        try {
+            const one = (await sql("SELECT box, path FROM blocks WHERE id='" + xrSqlEsc(e.id) + "' LIMIT 1")) || [];
+            if (!one.length) continue;
+            const base = xrSqlEsc(String(one[0].path || "").replace(/\.sy$/, ""));
+            const subs = (await sql("SELECT id FROM blocks WHERE type='d' AND box='" + xrSqlEsc(one[0].box)
+                + "' AND path LIKE '" + base + "/%' LIMIT 3000")) || [];
+            subs.forEach((r) => drop.add(r.id));
+        } catch (err) { /* 排除项取不到就只剔自身 */ }
+    }
+    const out = Array.from(ids.values()).filter((d) => !drop.has(d.id));
+    out.sort((a, b) => String(a.box).localeCompare(String(b.box))
+        || String(a.path).localeCompare(String(b.path)));
+    return out;
 }
 
 /**
@@ -2177,7 +2839,7 @@ function isAutoCaptionName(name, s) {
     const v = String(name || "").trim();
     if (!v) return false;
     const labs = captionLabelList(s).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    return new RegExp("^(?:" + labs.join("|") + ")\\s+\\d+(?:-\\d+)?$").test(v);
+    return new RegExp("^(?:" + labs.join("|") + ")\\s+\\d+(?:[-.]\\d+)*$").test(v);
 }
 
 /** CSS 值归一化：只为比对用（去空白、小写、去掉小数末尾的 0，0.10 与 0.1 视为同一个） */
@@ -2219,8 +2881,20 @@ function centerStyle(ial) {
     return captionStyle(ial, { center: true });
 }
 
-async function applyPlan(plan, refs, skip, protyle, rec) {
+async function applyPlan(plan, refs, skip, protyle, rec, opt) {
+    const prevBatch = XR_BATCH;
+    const batch = { blocks: [], pending: new Map(), doms: {} };
+    XR_BATCH = batch;
+    try {
     const miss = skip || new Set();
+    // 一次 getBlockDOMs 预取全部待改块，替代逐块 getBlockDOM
+    try {
+        const ids = Array.from(new Set([].concat(
+            (plan || []).map((p) => p.id), (refs || []).map((r) => r.id)))).filter(Boolean);
+        if (ids.length) batch.doms = (await api("/api/block/getBlockDOMs", { ids: ids })) || {};
+    } catch (e) { await logErr("applyPlan/getBlockDOMs", e); }
+    // v1.1.0 范围轮可传 {gap} 压缩块间等待；不传时下面四个间隔与 1.0.11 逐字一致。
+    const gap = (opt && Number.isFinite(opt.gap)) ? opt.gap : null;
     // 只有走 md 兜底时 IAL 才会被清空，这些块稍后要全量补属性
     const wiped = new Set();
     let lossy = 0;
@@ -2232,7 +2906,7 @@ async function applyPlan(plan, refs, skip, protyle, rec) {
             // 公式：只改 data-content 的 \tag，不重建块 —— 这是唯一不会丢公式正文的写法
             if (p.emptyEq) continue;                 // 空公式不编号
             try { await updateMathTag(p.id, p.seq, rec); } catch (e) { await logErr("applyPlan/math", e); }
-            await sleep(120);
+            await sleep(gap == null ? 10 : Math.min(gap, 20));
             continue;
         }
         // 内容没变就不写：避免每轮自动重排都重写全文、刷一堆历史记录
@@ -2240,17 +2914,33 @@ async function applyPlan(plan, refs, skip, protyle, rec) {
             if (looksLossy(p.curMd, p.newMd)) { lossy += 1; continue; }
             const ok = await updateContent(p.id, p.newMd, protyle, rec);
             if (!ok) wiped.add(p.id);
-            await sleep(150);
+            await sleep(gap == null ? 10 : Math.min(gap, 20));
         }
     }
     for (const r of refs) {
         if (miss.has(r.id)) continue;
+        /* v1.1.2：范围轮的引用刷新走 DOM 直改，绕开 Lute 重建丢引用节点的防呆。
+         * 单文档 buildPlan 产生的 refs 没有 anchors，仍旧走原来的 updateContent。 */
+        if (r.anchors && Object.keys(r.anchors).length) {
+            /* 统一由这里记撤销：updateRefAnchors 只负责改 DOM，不自己写 rec。 */
+            try {
+                const before = await api("/api/block/getBlockDOM", { id: r.id });
+                await updateRefAnchors(r.id, r.anchors, null);
+                const after = await api("/api/block/getBlockDOM", { id: r.id });
+                if (rec && before && before.dom && after && after.dom && before.dom !== after.dom) {
+                    rec.items.push({ id: r.id, before: before.dom, after: after.dom });
+                }
+            } catch (e) { await logErr("applyPlan/ref-anchors", e); }
+            await sleep(gap == null ? 10 : Math.min(gap, 20));
+            continue;
+        }
         if (looksLossy(r.old || "", r.next || "")) { lossy += 1; continue; }
         const ok = await updateContent(r.id, r.next, protyle, rec);
         if (!ok) wiped.add(r.id);
-        await sleep(150);
+        await sleep(gap == null ? 10 : Math.min(gap, 20));
     }
-    // 第二轮：补属性。正常情况下 DOM 写入没动属性，这里只会补「本来就没有」的那几个。
+    // 第二轮：补属性（一次 batchSetBlockAttrs 提交，失败自动回退逐条）。
+    const attrOps = [];
     for (const p of plan) {
         if (miss.has(p.id)) continue;
         const full = wiped.has(p.id);
@@ -2268,9 +2958,28 @@ async function applyPlan(plan, refs, skip, protyle, rec) {
         // 否则撤销只能把属性写成空，name / custom-xref 就永久丢了
         const old = {};
         Object.keys(attrs).forEach((k) => { old[k] = ialValue(p.ial, k); });
-        await retry(() => api("/api/attr/setBlockAttrs", { id: p.id, attrs: attrs }));
+        attrOps.push({ id: p.id, attrs: attrs });
         if (rec) rec.attrs.push({ id: p.id, before: old, after: attrs });
-        await sleep(80);
+    }
+    // v1.2.14 修复：必须先提交块内容，再写属性。
+    // 批量 DOM 来自 getBlockDOMs 预取旧快照（不含本轮新算的 name/style），
+    // 若放在属性之后提交，会把刚写好的 name / custom-xref / style 整块覆盖掉。
+    await flushBlockBatch(batch);
+    batch.blocks.length = 0;
+    if (attrOps.length) {
+        try {
+            await retry(() => api("/api/attr/batchSetBlockAttrs", { blockAttrs: attrOps }));
+        } catch (e) {
+            await logErr("applyPlan/batchAttrs", e);
+            for (const a of attrOps) {
+                try { await retry(() => api("/api/attr/setBlockAttrs", { id: a.id, attrs: a.attrs })); }
+                catch (e2) { await logErr("applyPlan/attr-fallback", e2); }
+            }
+        }
+    }
+    } finally {
+        XR_BATCH = prevBatch;
+        if (batch.blocks.length) await flushBlockBatch(batch);  // 异常兜底，正常路径已提交
     }
 }
 
@@ -2370,6 +3079,30 @@ function caretToBlockEnd(blockId) {
     sel.removeAllRanges();
     sel.addRange(r);
     return true;
+}
+
+/** v1.2.16：修「在文字后面插入引用变成纯文本」。
+ *  思源把行内插入的 block-ref span 降级成 data-type="text"（带 white-space:normal IAL）；
+ *  实测把整块 DOM 用 updateBlock(dom) 写回能保留 ((id "锚"))，这里据此把降级节点换回来。
+ *  只在检测到降级时写一次；单独块插入正常时直接返回，不产生额外写入。 */
+async function fixInlineRef(blockId, refId, name) {
+    if (!blockId || !refId || !name) return;
+    try {
+        await sleep(250);
+        const cur = await api("/api/block/getBlockDOM", { id: blockId });
+        const dom = cur && cur.dom;
+        if (!dom) return;
+        if (dom.indexOf('data-type="block-ref"') >= 0 &&
+            dom.indexOf('data-id="' + refId + '"') >= 0) return;   // 本来就是真引用
+        const re = /<span data-type="text"[^>]*>([^<]*)<\/span>/g;
+        let hit = null, m;
+        while ((m = re.exec(dom))) { if (m[1] === name) { hit = m; break; } }
+        if (!hit) return;
+        const good = '<span data-type="block-ref" data-subtype="s" data-id="' + refId + '">'
+            + name + "</span>";
+        const next = dom.slice(0, hit.index) + good + dom.slice(hit.index + hit[0].length);
+        await retry(() => api("/api/block/updateBlock", { id: blockId, dataType: "dom", data: next }));
+    } catch (e) { await logErr("fixInlineRef", e); }
 }
 
 function esc(s) {
@@ -2499,6 +3232,16 @@ class SiYuanXref extends Plugin {
                     this.renumber(protyle).catch((e) => { logErr("slash:xrefnum", e); });
                 },
             },
+            {
+                id: "xref-scope",
+                filter: ["xrefscope", "重排范围", "范围重排", "scope"],
+                html: '<div class="b3-list-item__first"><span class="b3-list-item__text">' + esc(tr("slash.scope.text")) + "</span>" +
+                    '<span class="b3-list-item__meta">' + esc(tr("slash.scope.meta")) + "</span></div>",
+                showInLite: true,
+                callback: () => {
+                    this.renumberScope().catch((e) => { logErr("slash:xrefscope", e); });
+                },
+            },
         ];
         // 原生命令：注册后自动出现在「设置 → 快捷键 → 插件」里，可以在那里改键；
         // 默认不占键位（hotkey 留空），实际快捷键由插件设置面板统一管理，避免两套键互撞。
@@ -2526,6 +3269,12 @@ class SiYuanXref extends Plugin {
                 langText: tr("cmd.redo"),
                 hotkey: "",
                 editorCallback: () => { this.fire("redo", null, null); },
+            });
+            this.addCommand({
+                langKey: "xrefScope",
+                langText: tr("cmd.scope"),
+                hotkey: "",
+                editorCallback: () => { this.fire("scope", null, null); },
             });
         } catch (e) { logErr("addCommand", e); }
         // 自检：onload 真跑通才写这个文件，排查"插件装了但不生效"用
@@ -2567,6 +3316,169 @@ class SiYuanXref extends Plugin {
         // 把补全默认值后的设置落盘，排查「设置项没生效」时能直接看文件
         try { await this.saveData("settings.json", this.settings); } catch (e) {}
         this.setting = new Setting({ confirmCallback: () => this.saveSettings() });
+        /* v1.1.0 多文档范围重排设置。默认全关，不启用时不改变 1.0.11 的任何行为。 */
+        this.setting.addItem({
+            title: tr("set.scope.on"),
+            description: tr("set.scope.on.desc"),
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = !!this.settings.scopeEnabled;
+                inp.addEventListener("change", () => {
+                    this.settings.scopeEnabled = inp.checked; this.saveSettings();
+                });
+                return inp;
+            },
+        });
+        this.setting.addItem({
+            title: tr("set.scope.source"),
+            description: tr("set.scope.source.desc"),
+            createActionElement: () => {
+                const sel = document.createElement("select");
+                sel.className = "b3-select fn__size200";
+                [["docnum", tr("set.scope.source.docnum")],
+                    ["custom", tr("set.scope.source.custom")]].forEach(([v, tt]) => {
+                    const o = document.createElement("option");
+                    o.value = v; o.textContent = tt;
+                    if (this.settings.scopeSource === v) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener("change", () => {
+                    this.settings.scopeSource = sel.value; this.saveSettings();
+                });
+                return sel;
+            },
+        });
+        this.setting.addItem({
+            title: tr("set.scope.mode"),
+            description: tr("set.scope.mode.desc"),
+            createActionElement: () => {
+                const sel = document.createElement("select");
+                sel.className = "b3-select fn__size200";
+                [["continuous", tr("set.scope.mode.continuous")],
+                    ["bydoc", tr("set.scope.mode.bydoc")]].forEach(([v, tt]) => {
+                    const o = document.createElement("option");
+                    o.value = v; o.textContent = tt;
+                    if (this.settings.scopeMode === v) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener("change", () => {
+                    this.settings.scopeMode = sel.value; this.saveSettings();
+                });
+                return sel;
+            },
+        });
+        this.setting.addItem({
+            title: tr("set.scope.level"),
+            description: tr("set.scope.level.desc"),
+            createActionElement: () => {
+                const sel = document.createElement("select");
+                sel.className = "b3-select fn__size200";
+                [[0, tr("set.scope.level.all")]].concat(
+                    [1, 2, 3, 4, 5, 6].map((n) => [n, tr("set.scope.level.n", n)])
+                ).forEach(([v, t]) => {
+                    const o = document.createElement("option");
+                    o.value = String(v); o.textContent = t;
+                    if (Number(this.settings.scopePrefixLevel || 0) === v) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener("change", () => {
+                    this.settings.scopePrefixLevel = Number(sel.value) || 0;
+                    this.saveSettings();
+                    if (this._scopeCache) this._scopeCache.clear();
+                });
+                return sel;
+            },
+        });
+        this.setting.addItem({
+            title: tr("set.scope.levelByTarget"),
+            description: tr("set.scope.levelByTarget.desc"),
+            createActionElement: () => {
+                const ta = document.createElement("textarea");
+                ta.className = "b3-text-field";
+                ta.rows = 4;
+                ta.style.cssText = "width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;";
+                ta.value = JSON.stringify(this.settings.scopePrefixLevelByTarget || {}, null, 2);
+                ta.addEventListener("change", () => {
+                    try {
+                        const obj = JSON.parse(ta.value || "{}");
+                        this.settings.scopePrefixLevelByTarget =
+                            (obj && typeof obj === "object" && !Array.isArray(obj)) ? obj : {};
+                        this.saveSettings();
+                        if (this._scopeCache) this._scopeCache.clear();
+                    } catch (err) {
+                        showMessage(tr("msg.error", "JSON parse failed"), 5000, "error");
+                    }
+                });
+                return ta;
+            },
+        });
+        this.setting.addItem({
+            title: tr("set.scope.events"),
+            description: tr("set.scope.events.desc"),
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = this.settings.scopeAutoEvents !== false;
+                inp.addEventListener("change", () => {
+                    this.settings.scopeAutoEvents = inp.checked; this.saveSettings();
+                });
+                return inp;
+            },
+        });
+        this.setting.addItem({
+            title: tr("set.scope.custom"),
+            description: tr("set.scope.custom.desc"),
+            createActionElement: () => {
+                const box = document.createElement("div");
+                box.style.cssText = "display:flex;flex-direction:column;gap:6px;width:100%;";
+                const ta = document.createElement("textarea");
+                ta.className = "b3-text-field";
+                ta.rows = 4;
+                ta.style.cssText = "width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;";
+                ta.value = JSON.stringify({ targets: this.settings.scopeTargets || [],
+                    excluded: this.settings.scopeExcluded || [] }, null, 2);
+                ta.addEventListener("change", () => {
+                    try {
+                        const obj = JSON.parse(ta.value || "{}");
+                        this.settings.scopeTargets = Array.isArray(obj.targets) ? obj.targets : [];
+                        this.settings.scopeExcluded = Array.isArray(obj.excluded) ? obj.excluded : [];
+                        this.saveSettings();
+                    } catch (err) {
+                        showMessage(tr("msg.error", "JSON parse failed"), 5000, "error");
+                    }
+                });
+                const btn = document.createElement("button");
+                btn.className = "b3-button b3-button--outline fn__size200";
+                btn.textContent = tr("set.scope.import");
+                btn.addEventListener("click", async () => {
+                    if (await this.importScopeFromDocnum()) {
+                        ta.value = JSON.stringify({ targets: this.settings.scopeTargets,
+                            excluded: this.settings.scopeExcluded }, null, 2);
+                    }
+                });
+                box.appendChild(ta);
+                box.appendChild(btn);
+                return box;
+            },
+        });
+        this.setting.addItem({
+            title: tr("set.scope.pickerAuto"),
+            description: tr("set.scope.pickerAuto.desc"),
+            createActionElement: () => {
+                const inp = document.createElement("input");
+                inp.type = "checkbox";
+                inp.className = "b3-switch fn__flex-center";
+                inp.checked = this.settings.scopePickerAuto !== false;
+                inp.addEventListener("change", () => {
+                    this.settings.scopePickerAuto = inp.checked;
+                    this.saveSettings();
+                });
+                return inp;
+            },
+        });
         this.setting.addItem({
             title: tr("set.mode.title"),
             description: tr("set.mode.desc"),
@@ -2629,21 +3541,6 @@ class SiYuanXref extends Plugin {
                 inp.checked = this.settings.autoMode;
                 inp.addEventListener("change", () => {
                     this.settings.autoMode = inp.checked;
-                    this.saveSettings();
-                });
-                return inp;
-            },
-        });
-        this.setting.addItem({
-            title: tr("set.detect.title"),
-            description: tr("set.detect.desc"),
-            createActionElement: () => {
-                const inp = document.createElement("input");
-                inp.type = "checkbox";
-                inp.className = "b3-switch fn__flex-center";
-                inp.checked = this.settings.textDetect !== false;
-                inp.addEventListener("change", () => {
-                    this.settings.textDetect = inp.checked;
                     this.saveSettings();
                 });
                 return inp;
@@ -2882,8 +3779,33 @@ class SiYuanXref extends Plugin {
         // 文档事务 -> 防抖 -> 自动重排
         this.eventBus.on("ws-main", (e) => {
             const d = e && e.detail;
-            if (!d || d.cmd !== "transactions") return;
+            if (!d) return;
+            /* v1.1.0 范围轮：结构事件按 box 过滤命中才触发，判不准退回全量；
+             * 3s 防抖 + renumberScope 内的串行排队锁；默认 scopeEnabled=false 不生效。 */
+            if (d.cmd !== "transactions" && this.settings.scopeEnabled
+                && this.settings.scopeAutoEvents && Date.now() >= (this._quietUntil || 0)) {
+                (async () => {
+                    try {
+                        const cfg = await this.resolveScope();
+                        if (!xrScopeShouldRun(cfg, d.cmd, d.data)) return;
+                        clearTimeout(this._scopeTimer);
+                        this._scopeTimer = setTimeout(() => {
+                            this.renumberScope({ auto: true, silent: true })
+                                .catch((err) => logErr("scope:auto", err));
+                        }, 3000);
+                    } catch (err) { logErr("scope:event", err); }
+                })();
+            }
+            if (d.cmd !== "transactions") return;
             if (Date.now() < (this._quietUntil || 0)) return; // 自己刚写完，别自激
+            /* v1.1.2：文档内编辑只弄脏当前这一篇；其它文档的块顺序缓存不动。 */
+            if (this.settings.scopeEnabled) {
+                try {
+                    const p = this.currentProtyle();
+                    const id = p ? getDocId(p) : docIdFromDom();
+                    if (id) (this._scopeDirty = this._scopeDirty || new Set()).add(id);
+                } catch (e) { /* 拿不到文档 id 就不标，下次全量兜底 */ }
+            }
             let touched = false;
             const acts = this._debug ? [] : null; // 不在诊断模式就别攒这个数组了
             try {
@@ -2958,6 +3880,8 @@ class SiYuanXref extends Plugin {
             });
         } else if (act === "num") {
             this.renumber(p).catch((e) => { logErr("hotkey:num", e); });
+        } else if (act === "scope") {
+            this.renumberScope().catch((e) => { logErr("hotkey:scope", e); });
         } else if (act === "undo") {
             this.undoLast().catch((e) => { logErr("hotkey:undo", e); });
         } else if (act === "redo") {
@@ -2991,36 +3915,50 @@ class SiYuanXref extends Plugin {
         let last = 0;
         const deco = () => {
             const now = Date.now();
-            if (now - last < 400) return;      // 打字时 DOM 变化很频繁，节流一下
+            if (now - last < 400) return;
             last = now;
-            // 思源把「所有插件的设置页」都渲染在同一个配置对话框里，只是用 fn__none 藏起来，
-            // 所以不能拿 .b3-dialog__body 当容器（会插到别的插件设置里）。
-            // 做法：先找到本插件的第一项（编号模式），再往上找它所属的那一页。
-            const all = document.querySelectorAll(".b3-label");
-            let mine = null;
-            for (const l of all) {
-                if ((l.textContent || "").indexOf(tr("set.mode.title")) >= 0) { mine = l; break; }
+            // 找本插件第一项（启用范围重排），跳过被 fn__none 藏起来的设置页
+            let mine = null, fallback = null;
+            for (const l of document.querySelectorAll(".b3-label")) {
+                if ((l.textContent || "").indexOf(tr("set.scope.on")) < 0) continue;
+                if (!fallback) fallback = l;
+                if (l.getBoundingClientRect().height) { mine = l; break; }
             }
+            mine = mine || fallback;   // 面板未激活时也能装饰，用户切过来即可看到
             if (!mine) return;
-            const box = mine.closest(".config__tab-container") || mine.closest(".b3-dialog__body");
-            if (!box || box.dataset.xrDeco === "1") return;
-            const rows = box.querySelectorAll(".b3-label");
-            // 本插件是 12 项。数量对不上说明容器抓错了 —— 宁可不装饰，也不能动别人的设置项
-            if (rows.length < 10 || rows.length > 18) return;
-            box.dataset.xrDeco = "1";
-            box.classList.add("xr-setting");
-            // 边界按 addItem 的顺序：编号 0-1 / 触发与引用 2-5 / 题注外观 6-7 / 快捷键 8 / 高级 9-11
-            const cuts = [[0, tr("set.grp.num")], [2, tr("set.grp.trigger")],
-                          [6, tr("set.grp.look")], [8, tr("set.grp.keys")],
-                          [9, tr("set.grp.adv")]];
-            cuts.slice().reverse().forEach((c) => {   // 倒序插入，前面插入不会打乱后面 row 的引用
-                const row = rows[c[0]];
-                if (!row) return;
-                const h = document.createElement("div");
-                h.className = "xr-group";
-                h.textContent = c[1];
-                row.parentNode.insertBefore(h, row);
+            // v1.2.4：容器必须是「直接装 label 的那一层」(通常是 .b3-dialog__content)。
+            // 用 .b3-dialog__body 会把分组 append 到空内容区之后 → 顶部一大块空白、无法滚动。
+            const parent = mine.parentElement;
+            if (!parent || parent.dataset.xrDeco === "3") return;
+            const rows = Array.prototype.slice.call(parent.querySelectorAll(".b3-label"));
+            if (rows.length < 15 || rows.length > 24) return;   // 数量对不上 = 容器抓错
+            parent.dataset.xrDeco = "3";
+            parent.classList.add("xr-setting");
+            const marker = document.createComment("xr-setting-groups");
+            parent.insertBefore(marker, rows[0]);   // 记住原第一项的位置
+            const groups = [
+                // 2026-11-10：单页/通用 11 项在前，书籍多页/范围 8 项收进默认折叠区
+                { label: tr("set.grp.single"), idx: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], open: true },
+                { label: tr("set.grp.book"),   idx: [0, 1, 2, 3, 4, 5, 6, 7],                   open: false },
+            ];
+            groups.forEach((g) => {
+                const d = document.createElement("details");
+                d.className = "xr-set-group";
+                if (g.open) d.open = true;
+                const sm = document.createElement("summary");
+                const t = document.createElement("span");
+                t.className = "xr-set-group-t"; t.textContent = g.label;
+                const n = document.createElement("span");
+                n.className = "xr-set-group-n"; n.textContent = tr("set.grp.items", g.idx.length);
+                sm.appendChild(t); sm.appendChild(n);
+                d.appendChild(sm);
+                const body = document.createElement("div");
+                body.className = "xr-set-group-b";
+                g.idx.forEach((i) => { if (rows[i]) body.appendChild(rows[i]); });
+                d.appendChild(body);
+                parent.insertBefore(d, marker);   // 放回原位置，不产生空白
             });
+            marker.remove();
         };
         const mo = new MutationObserver(deco);
         mo.observe(document.body, { childList: true, subtree: true });
@@ -3746,11 +4684,255 @@ class SiYuanXref extends Plugin {
         await this.saveData("settings.json", this.settings);
         showMessage(tr("msg.settingsSaved"));
     }
+    /** v1.2.9：插入面板筛选状态静默落盘（不弹「已保存」打扰用户），防抖 250ms。 */
+    savePickerState() {
+        clearTimeout(this._pickerSaveTimer);
+        this._pickerSaveTimer = setTimeout(() => {
+            try { this.saveData("settings.json", this.settings); } catch (e) { /* 落盘失败不影响使用 */ }
+        }, 250);
+    }
 
     /**
      * opts.auto  自动模式：绝不写入光标所在的块（打断输入），等光标离开再排
      * opts.silent 成功不弹提示（自动模式用）
      */
+    /** 解析范围配置：可切「跟随编号插件」/「本插件自定义」。 */
+    async resolveScope() {
+        let dnCfg = null;
+        try {
+            const dn = globalThis.__siyuanDocNumTest;
+            if (dn && typeof dn.getConfig === "function") dnCfg = await dn.getConfig();
+        } catch (e) { /* 编号插件不在 / 没加载好 → 降级 */ }
+        return xrScopeResolve(this.settings, dnCfg);
+    }
+
+    /** 设置面板「从编号插件导入」：把它的 targets/excluded 复制成本插件自定义范围。 */
+    async importScopeFromDocnum() {
+        try {
+            const dn = globalThis.__siyuanDocNumTest;
+            if (!dn || typeof dn.getConfig !== "function") throw new Error("docnum plugin missing");
+            const cfg = await dn.getConfig();
+            this.settings.scopeTargets = Array.isArray(cfg.targets) ? cfg.targets.slice() : [];
+            this.settings.scopeExcluded = Array.isArray(cfg.excluded) ? cfg.excluded.slice() : [];
+            this.settings.scopeSource = "custom";
+            this.saveSettings();
+            showMessage(tr("set.scope.import.ok", this.settings.scopeTargets.length,
+                this.settings.scopeExcluded.length), 6000);
+            return true;
+        } catch (e) {
+            showMessage(tr("set.scope.import.fail"), 6000, "error");
+            return false;
+        }
+    }
+
+    /** 范围 → 有序文档清单。docnum 来源走编号插件的 rangeDocIdsOrdered()（文档树顺序）。 */
+    async resolveScopeDocs(cfg) {
+        let docs = null;
+        if (cfg && cfg.source === "docnum") {
+            try {
+                const dn = globalThis.__siyuanDocNumTest;
+                if (dn && typeof dn.rangeDocIdsOrdered === "function") {
+                    docs = await dn.rangeDocIdsOrdered();
+                }
+            } catch (e) { /* 旧版编号插件没有这个接口 → 退回 custom */ }
+        }
+        if (!docs) docs = await xrScopeDocsCustom(cfg);
+        /* v1.1.3：custom 来源（或旧版编号插件）返回的 docs 没有 meta。
+         * 一次 batchGetBlockAttrs 把 custom-doc-num-meta 补齐，保证 bydoc 前缀
+         * 永远取 rootNum；否则会退化成文档树序号，把已有章节号改坏。 */
+        const missing = docs.filter((d) => !d.meta).map((d) => d.id);
+        for (let i = 0; i < missing.length; i += 100) {
+            const chunk = missing.slice(i, i + 100);
+            try {
+                const r = await api("/api/attr/batchGetBlockAttrs", { ids: chunk });
+                // api() 已经返回 r.data，这里直接用，不能再取 .data
+                const data = r || {};
+                docs.forEach((d) => {
+                    if (d.meta) return;
+                    const a = data[d.id];
+                    const raw = a && a["custom-doc-num-meta"];
+                    if (!raw) return;
+                    try { d.meta = JSON.parse(String(raw)); } catch (e) { /* 坏值当没有 */ }
+                });
+            } catch (e) { /* 读不到就回退文档树序号 */ }
+        }
+        return docs;
+    }
+
+    /**
+     * v1.1.0 范围内多文档重排。与单文档 renumber() 完全独立：
+     *  - 串行排队锁；任一文档采集失败整批不写；
+     *  - dryRun 只算不写（真机零写入验证入口）；
+     *  - 引用只刷范围内；撤销记录按块带 doc，可整批回放。
+     */
+    /** v1.1.6：读当前文档的 custom-doc-num-meta，按 scopePrefixLevel 取章节前缀。
+     *  一次 batchGetBlockAttrs，只读本文档；返回 undefined = 无 meta（保持原口径），
+     *  返回 "" = 层级不够、不显示前缀。 */
+    async currentScopePrefix(docId) {
+        if (!docId) return undefined;
+        try {
+            const r = await api("/api/attr/batchGetBlockAttrs", { ids: [docId] });
+            const a = r && r[docId];
+            const raw = a && a["custom-doc-num-meta"];
+            if (!raw) return undefined;
+            const m = JSON.parse(String(raw));
+            return xrScopePrefix(m && m.rootNum,
+                xrLevelForDoc({ meta: m }, this.settings.scopePrefixLevel,
+                    this.settings.scopePrefixLevelByTarget));
+        } catch (e) { return undefined; }
+    }
+
+    /** v1.1.8：取当前文档所属的第 N 级章节链，用于自动收窄交叉引用窗口。
+     *  当前文档已有 meta → 直接取 rootNum 前 N 段；还没编号（新建文档）→
+     *  沿 path 找到第 N 级祖先，读它的 rootNum。取不到返回空串 = 不收窄。 */
+    async currentLevelChain(docId, level, overrides) {
+        const n = Number(level) || 0;
+        if (!docId || n <= 0) return "";
+        const escId = (x) => String(x).replace(/'/g, "''");
+        try {
+            const rows = await sql("SELECT id, path, ial FROM blocks WHERE id='" + escId(docId) + "' LIMIT 1");
+            const row = rows && rows[0];
+            if (!row) return "";
+            let meta = xrParseMeta(row.ial);
+            if (!meta || !meta.rootNum) {
+                // v1.2.7：新建文档常没 meta；沿 path 由近到远找任意有编号的祖先
+                const seg = String(row.path || "").replace(/^\/+/, "").split("/")
+                    .map((x) => String(x).replace(/\.sy$/, "")).filter(Boolean);
+                const ancIds = seg.slice(0, -1).reverse().filter((x) => x !== docId);
+                if (ancIds.length) {
+                    const inl = ancIds.map((x) => "'" + escId(x) + "'").join(",");
+                    const ars = await sql("SELECT id, ial FROM blocks WHERE id IN (" + inl + ") LIMIT -1");
+                    const byAnc = new Map((ars || []).map((r) => [r.id, r]));
+                    for (const aid of ancIds) {
+                        const m = xrParseMeta(byAnc.get(aid) && byAnc.get(aid).ial);
+                        if (m && m.rootNum) { meta = m; break; }
+                    }
+                }
+            }
+            // v1.2.0：该文档所属 target 可有专属层级
+            const nEff = xrLevelForDoc({ meta: meta }, n, overrides);
+            // v1.1.9：键里带 rootID，区分不同范围根下同名的 1.2.3
+            return xrChainKeyFromMeta(meta, nEff);
+        } catch (e) { return ""; }
+    }
+
+    async renumberScope(opts) {
+        const o = opts || {};
+        const s = this.settings;
+        if (!s.scopeEnabled && !o.force) {
+            if (!o.silent) showMessage(tr("msg.scope.none"), 4000);
+            return { ok: false, why: "disabled" };
+        }
+        if (this._scopeRunningPromise) {
+            try { await this._scopeRunningPromise; } catch (e) { /* 上一轮失败不影响本轮 */ }
+            if (o.auto) return { ok: false, why: "busy" };
+            if (!o.silent) showMessage(tr("msg.scope.busy"), 3000);
+        }
+        let release;
+        const lock = new Promise((r) => { release = r; });
+        this._scopeRunningPromise = lock;
+        try {
+            const cfg = await this.resolveScope();
+            if (cfg.degraded && !o.silent) showMessage(tr("msg.scope.nodn"), 4000);
+            const docs = await this.resolveScopeDocs(cfg);
+            if (!docs.length) {
+                if (!o.silent) showMessage(tr("msg.scope.none"), 4000);
+                return { ok: false, why: "empty" };
+            }
+            const cap = Math.max(1, parseInt(s.scopeMaxDocs, 10) || 500);
+            if (docs.length > cap) {
+                if (!o.silent) showMessage(tr("msg.scope.limit", docs.length), 8000, "error");
+                return { ok: false, why: "over-limit", docs: docs.length };
+            }
+            /* v1.1.2 增量缓存：文档级事件只换文档列表，文档内块顺序缓存不动；
+             * 只有标脏的文档（插/删/改标题、或上轮写回过）才重扫。 */
+            this._scopeCache = this._scopeCache || new Map();
+            this._scopeCacheDocs = this._scopeCacheDocs || [];
+            this._scopeDirty = this._scopeDirty || new Set();
+            this._scopeTagWritten = this._scopeTagWritten || new Map();
+            const idsNow = docs.map((d) => d.id);
+            // 文档列表变化（拖动 / 新建 / 删除 / 改名）只换顺序，不改文档内部块顺序：
+            // 缓存按 id 命中即复用，只有新加入的文档才需采集，因此不算 full。
+            const full = o.full === true || !this._scopeCache.size;
+            const dirty = full ? null : new Set(this._scopeDirty);
+            const perDoc = await xrScopeCollectDocs(docs, {
+                concurrency: s.scopeConcurrency || 20,
+                cache: full ? null : this._scopeCache,
+                dirty: dirty,
+            });
+            const keep = new Set(idsNow);
+            Array.from(this._scopeCache.keys()).forEach((k) => { if (!keep.has(k)) this._scopeCache.delete(k); });
+            (full ? perDoc : perDoc.filter((pd) => dirty.has(pd.doc.id)))
+                .forEach((pd) => this._scopeCache.set(pd.doc.id, { doc: pd.doc, blocks: pd.blocks }));
+            this._scopeCacheDocs = idsNow.slice();
+            this._scopeDirty.clear();
+            const rescanned = Number(perDoc.rescanned) || (full ? docs.length : 0);
+            const built = xrBuildScopePlan(perDoc, s, s.scopeMode);
+            /* updateMathTag 改的是 DOM 的 data-content，SQL 的 blocks.markdown 里 \tag 不同步，
+             * 只按 markdown 判 tagOk 会恒报「公式要改」。用上轮实际写入的 seq 兜住。 */
+            built.plan.forEach((p) => {
+                if (p.kind === "eq" && this._scopeTagWritten.get(p.id) === p.seq) p.tagOk = true;
+            });
+            const anchor = xrScopeAnchor(built.plan);
+            const refs = s.refreshRefs === false ? [] : xrScopeRefs(built.allBlocks, anchor);
+            // 只把「真的要改」的块交给写回；空公式不编号、eq 用 tagOk 判定，避免恒报要改
+            const plan = built.plan.filter((p) => {
+                if (p.emptyEq) return false;
+                return p.kind === "eq" ? !p.tagOk : (p.newMd && p.newMd !== p.curMd);
+            });
+            const preview = {
+                ok: true, dryRun: !!o.dryRun, docs: docs.length,
+                plan: plan.length, refs: refs.length,
+                source: cfg.source, mode: s.scopeMode,
+                blocks: built.allBlocks.length, captions: built.plan.length,
+                full: full, rescanned: rescanned, cached: docs.length - rescanned,
+                names: built.plan.slice(0, 8).map((p) => p.name),
+                docIds: docs.map((d) => d.id),
+            };
+            if (o.dryRun) {
+                if (!o.silent) showMessage(tr("msg.scope.dry", docs.length, plan.length, refs.length), 7000);
+                return preview;                    // 零写入
+            }
+            if (!plan.length && !refs.length) return Object.assign(preview, { changed: 0 });
+            // getLute() 有 window.Lute 全局兜底：没有打开文档时仍走 DOM 路径、不会清 IAL。
+            // 只有连全局 Lute 都没有才中止（那是真会退化成 markdown 兜底的形态）。
+            if (!this._lastProtyle && !(typeof window !== "undefined" && window.Lute)) {
+                throw new Error("没有可用的编辑器实例与全局 Lute，已中止写回（markdown 兜底会清空题注属性）");
+            }
+            const gap = 30;
+            this._quietUntil = Date.now() + Math.min(4000 + (plan.length + refs.length) * (gap + 60), 20000);
+            const rec = { doc: getDocId(this._lastProtyle) || "", scope: true,
+                t: Date.now(), items: [], attrs: [], docs: docs.map((d) => d.id) };
+            await applyPlan(plan, refs, new Set(), this._lastProtyle, rec, { gap: gap });
+            const docOf = new Map(), parentOf = new Map();
+            built.allBlocks.forEach((b) => {
+                docOf.set(b.id, b.docId);
+                parentOf.set(b.id, b.parent_id || b.docId);
+            });
+            rec.items.forEach((it) => {
+                it.doc = docOf.get(it.id) || "";
+                it.pid = parentOf.get(it.id) || it.doc;
+            });
+            this.pushUndo(rec);
+            // 写回过的文档标脏：下次范围轮只重扫这几篇，其余缓存不动
+            plan.forEach((p) => {
+                if (p.docId) this._scopeDirty.add(p.docId);
+                if (p.kind === "eq") this._scopeTagWritten.set(p.id, p.seq);
+            });
+            refs.forEach((r) => { if (r.docId) this._scopeDirty.add(r.docId); });
+            if (!o.silent) showMessage(tr("msg.scope.done", docs.length, plan.length, refs.length), 7000);
+            return Object.assign(preview, { changed: plan.length + refs.length });
+        } catch (e) {
+            await logErr("renumberScope", e);
+            if (!o.silent) showMessage(tr("msg.scope.readfail", (e && e.message) || e), 9000, "error");
+            return { ok: false, error: String((e && e.message) || e) };
+        } finally {
+            if (this._scopeRunningPromise === lock) this._scopeRunningPromise = null;
+            release();
+            this._quietUntil = Math.max(this._quietUntil || 0, Date.now() + 2500);
+        }
+    }
+
     async renumber(protyle, opts) {
         const o = opts || {};
         // 重入保护：自动轮和手动轮同时跑会互相覆盖编号
@@ -3831,7 +5013,18 @@ class SiYuanXref extends Plugin {
             } else {
                 this._deadPending = null;
             }
-            const r = buildPlan(blocks, this.settings, burnable, excl);
+            /* v1.1.4：范围功能开启时，单文档自动重排也按本文档章节号编号。
+             * 只读当前文档的一个属性，不扫范围、不影响其它文档。 */
+            let planSettings = this.settings;
+            if (this.settings.scopeEnabled && this.settings.scopeMode === "bydoc") {
+                const prefix = await this.currentScopePrefix(docId);
+                if (prefix === "") {
+                    planSettings = Object.assign({}, this.settings, { __scopeNoPrefix: true });
+                } else if (prefix) {
+                    planSettings = Object.assign({}, this.settings, { __scopePrefix: prefix });
+                }
+            }
+            const r = buildPlan(blocks, planSettings, burnable, excl);
             if (!r.plan.length && !r.refs.length) {
                 if (!o.silent) showMessage(tr("msg.noTargets"), 4000);
                 // 自动轮空手而归，但刚刚确实有人在敲字 —— 多半是刚写的那一行还没进索引，
@@ -4026,7 +5219,7 @@ class SiYuanXref extends Plugin {
                 // 没有才退回 before —— 重建的目的是「把块找回来」，不是「退回重排前」
                 if (/tree not found|not found/i.test(msg)) {
                     const a = attrOf.get(it.id);
-                    if (await rebuildBlock(it.after || dom, it.id, it.pid || rec.doc, a ? a.after : null)) rebuilt++;
+                    if (await rebuildBlock(it.after || dom, it.id, it.pid || it.doc || rec.doc, a ? a.after : null)) rebuilt++;
                     else miss++;
                 } else {
                     miss++;
@@ -4046,6 +5239,10 @@ class SiYuanXref extends Plugin {
         this._undo = this._undo || [];
         if (!this._undo.length) { showMessage(tr("msg.noUndo"), 4000); return; }
         const rec = this._undo.pop();
+        /* v1.1.2：撤销改了块内容，范围轮缓存必须失效，否则会拿旧快照判定。 */
+        if (this._scopeCache) this._scopeCache.clear();
+        if (this._scopeDirty) this._scopeDirty.clear();
+        if (this._scopeTagWritten) this._scopeTagWritten.clear();
         this._quietUntil = Date.now() + 2500;   // 自己写回去的改动别被当成用户编辑再触发一轮
         let r = { n: 0, miss: 0 };
         try { r = await this.replay(rec, "before"); }
@@ -4065,6 +5262,10 @@ class SiYuanXref extends Plugin {
         this._redo = this._redo || [];
         if (!this._redo.length) { showMessage(tr("msg.noRedo"), 4000); return; }
         const rec = this._redo.pop();
+        /* v1.1.2：重做同样改块内容，范围轮缓存失效。 */
+        if (this._scopeCache) this._scopeCache.clear();
+        if (this._scopeDirty) this._scopeDirty.clear();
+        if (this._scopeTagWritten) this._scopeTagWritten.clear();
         this._quietUntil = Date.now() + 2500;
         let r = { n: 0, miss: 0, rebuilt: 0 };
         try { r = await this.replay(rec, "after"); } catch (e) { await logErr("redoLast", e); }
@@ -4258,6 +5459,72 @@ class SiYuanXref extends Plugin {
         } catch (e) {}
     }
 
+    /** v1.2.17：picker 候选快速取数 —— 一次 attributes 自连接拿题注块 id / 类型 / 块名 / 所属文档。
+     *  不扫全量块、不逐篇取文档顺序；查不到或块名全空返回 null，由调用方回退原链路。 */
+
+    /**
+     * 弹窗候选：一条 SQL 从 attributes 拿齐全库题注 + 文档编号元数据 + 文档名 + 正文。
+     * v1.2.18（用户 2026-11-10）：弹窗不需要枚举文档树，不再调编号插件 rangeDocIdsOrdered()。
+     * 实测 6.49ms / 87 行；name 87/87 格式统一为「图 1-1 / 表 1-1 / 式 1-1」。
+     */
+    async pickerAllRows() {
+        const rows = await sql("SELECT a.block_id AS id, a.root_id AS docId, "
+            + "a.value AS kind, n.value AS name, m.value AS meta, "
+            + "d.content AS docTitle, b.markdown AS md "
+            + "FROM attributes a "
+            + "LEFT JOIN attributes n ON n.block_id = a.block_id AND n.name = 'name' "
+            + "LEFT JOIN attributes m ON m.block_id = a.root_id AND m.name = 'custom-doc-num-meta' "
+            + "LEFT JOIN blocks d ON d.id = a.root_id AND d.type = 'd' "
+            + "LEFT JOIN blocks b ON b.id = a.block_id "
+            + "WHERE a.name = 'custom-xref' LIMIT -1");
+        if (!rows || !rows.length) return null;
+        const out = rows.filter((r) => r.id && r.name).map((r) => {
+            let meta = null;
+            try { meta = r.meta ? JSON.parse(String(r.meta)) : null; }
+            catch (e) { meta = null; }
+            const md = r.md || "";
+            return {
+                id: r.id, docId: r.docId, kind: r.kind, name: r.name,
+                docMeta: meta, docTitle: r.docTitle || "", chapterLabel: r.docTitle || "",
+                curMd: md, oldMd: md.slice(0, 60),
+                hPath: "", hLv: 0, hText: "", seq: 0,
+            };
+        });
+        // numeric:true 保证「图 3-2」排在「图 3-10」前（纯字典序会反过来）
+        out.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined,
+            { numeric: true }) || String(a.docId).localeCompare(String(b.docId)));
+        return out.length ? out : null;
+    }
+
+    /** 当前文档的编号元数据：一次 SQL，必要时沿 path 再查一次祖先；各层级链键本地算。 */
+    async pickerChainMeta(docId) {
+        if (!docId) return null;
+        const escId = (x) => String(x).replace(/'/g, "''");
+        try {
+            const rows = await sql("SELECT id, path, ial FROM blocks WHERE id='"
+                + escId(docId) + "' LIMIT 1");
+            const row = rows && rows[0];
+            if (!row) return null;
+            let meta = xrParseMeta(row.ial);
+            if (!meta || !meta.rootNum) {
+                const seg = String(row.path || "").replace(/^\/+/, "").split("/")
+                    .map((x) => String(x).replace(/\.sy$/, "")).filter(Boolean);
+                const ancIds = seg.slice(0, -1).reverse().filter((x) => x !== docId);
+                if (ancIds.length) {
+                    const inl = ancIds.map((x) => "'" + escId(x) + "'").join(",");
+                    const ars = await sql("SELECT id, ial FROM blocks WHERE id IN ("
+                        + inl + ") LIMIT -1");
+                    const byAnc = new Map((ars || []).map((r) => [r.id, r]));
+                    for (const aid of ancIds) {
+                        const m = xrParseMeta(byAnc.get(aid) && byAnc.get(aid).ial);
+                        if (m && m.rootNum) { meta = m; break; }
+                    }
+                }
+            }
+            return meta || null;
+        } catch (e) { return null; }
+    }
+
     async openPicker(protyle, nodeEl, opts) {
         const o = opts || {};
         // opts.anchorId = 由调用方指定「引用条插到哪个段落」，比从选区反推稳。
@@ -4298,20 +5565,138 @@ class SiYuanXref extends Plugin {
         }
         let rows = [];
         let sections = [];
+        let scopeMode = false;
+        let defaultChapter = "";
+        let allRows = [];                 // v1.2.8：全范围题注，切层级时重新过滤
+        let levelList = [];               // v1.2.8：可选范围层级 1..n
+        let levelKeys = new Map();        // v1.2.8：L -> 当前文档在该层级的范围键
+        let curLevel = 0;
+        let rebuildRows = null;           // v1.2.8：切层级时重算 rows / sections
+        let widenNote = "";               // v1.2.11：空范围自动放宽的说明，显示在头部副标题
         try {
-            // 用 collectFresh 而不是 collectBlocks：面板刚打开时，用户可能刚写完一个题注，
-            // blocks 表索引还没跟上（实测 0.6~2s）→ 采不到它，面板里就少一条。
-            // collectFresh 会拿页面 DOM 里的一级块 id 对照快照，缺了重采；拿不到 DOM 时行为与 collectBlocks 一致。
-            const fresh = await collectFresh(docId, protyle);
-            const built = buildPlan(fresh.blocks, this.settings);
-            rows = built.plan;
-            sections = built.sections || [];
+            if (this.settings.scopeEnabled) {
+                /* v1.2.8：窗口范围 = 当前文档所在「第 L 级链」（rootID | rootNum 前 L 段）。
+                 * L 默认 = 章节前缀层级 - 1（同篇内可跨章）；想跨篇就切到 1 级目录。
+                 * 层级信息直接取文档属性 custom-doc-num-meta 的 rootID / rootNum，
+                 * 不再额外推算。超出该链的题注在 rows 层就被砍掉，窗口没有「全部范围」
+                 * 放行口，也不跨笔记本 / 不跨 top 目录。 */
+                /* v1.2.18 弹窗提速：弹窗不需要枚举文档树。
+                 * 一条 attributes SQL 拿齐全库题注 + 文档编号元数据 + 文档名 + 正文，
+                 * 不再调 resolveScope() / resolveScopeDocs() / 编号插件 rangeDocIdsOrdered()。
+                 * SQL 异常或空结果才回退原完整链路，行为与改前一致。 */
+                let docs = [];
+                let planRows = null;
+                try { planRows = await this.pickerAllRows(); }
+                catch (e) { await logErr("openPicker/fast", e); }
+                if (!planRows || !planRows.length) {
+                    const cfg = await this.resolveScope();
+                    docs = await this.resolveScopeDocs(cfg);
+                    this._scopeCache = this._scopeCache || new Map();
+                    const perDoc = await xrScopeCollectDocs(docs, {
+                        concurrency: this.settings.scopeConcurrency || 20,
+                        cache: this._scopeCache,
+                        dirty: this._scopeDirty || null,
+                    });
+                    perDoc.forEach((pd) => this._scopeCache.set(pd.doc.id,
+                        { doc: pd.doc, blocks: pd.blocks }));
+                    const built = xrBuildScopePlan(perDoc, this.settings, this.settings.scopeMode);
+                    planRows = built.plan;
+                }
+                const titles = new Map(docs.map((d) => [d.id, d.title || ""]));
+                const byId = new Map(docs.map((d) => [d.id, d]));
+                const pLevel = xrPickerLevel(this.settings.scopePrefixLevel);
+                const pOv = xrPickerOverrides(this.settings.scopePrefixLevelByTarget || {});
+                allRows = planRows.map((p) => {
+                    const d = byId.get(p.docId) || { meta: p.docMeta, title: p.docTitle };
+                    const meta = p.docMeta || d.meta || null;
+                    const ck = xrChainKeyFromMeta(meta, xrLevelForDoc(d, pLevel, pOv));
+                    return Object.assign({}, p, {
+                        docTitle: p.docTitle || titles.get(p.docId) || "",
+                        chapterLabel: p.chapterLabel || d.title || "",
+                        chapterKey: ck,
+                        hPath: ck,
+                        docMeta: meta,
+                    });
+                });
+                levelList = xrPickerLevelList(this.settings.scopePrefixLevel);
+                // v1.2.9：记住的层级优先；没存过（-1）才走默认。0 是合法值，不能用 || 判断。
+                curLevel = xrPickerSavedLevel(this.settings.pickerLevel, levelList,
+                    xrPickerDefaultLevel(this.settings.scopePrefixLevel,
+                        this.settings.scopePickerAuto !== false));
+                // 当前文档编号元数据只查一次，各层级链键本地算（原来每级各一次 SQL）
+                const curMeta = await this.pickerChainMeta(docId);
+                if (levelList.length) {
+                    for (const L of levelList) {
+                        levelKeys.set(L, L > 0 ? xrChainKeyFromMeta(curMeta, L) : "");
+                    }
+                }
+                rebuildRows = () => {
+                    if (curLevel > 0) {
+                        /* 硬过滤：只留与当前文档同一 rootID、同一前 L 段链的题注。
+                         * key 取不到（当前文档没编号）→ 空列表，绝不回退全范围。 */
+                        rows = xrPickerRowsInLevel(allRows, levelKeys.get(curLevel) || "", curLevel);
+                        rows.forEach((x) => {
+                            x.chapterKey = xrChainKeyFromMeta(x.docMeta, curLevel);
+                            x.hPath = x.chapterKey;
+                        });
+                    } else {
+                        // v1.2.9：L=0 = 跨所有笔记本（全范围）。分组键按文档自身第
+                        // (n-1) 级链算，章节下拉仍能逐章节筛，但不再砍掉别的笔记本。
+                        rows = allRows.slice();
+                        rows.forEach((x) => {
+                            x.chapterKey = xrChainKeyFromMeta(x.docMeta, pLevel) || x.docId;
+                            x.hPath = x.chapterKey;
+                        });
+                    }
+                    const chapters = new Map();
+                    rows.forEach((x) => {
+                        if (x.chapterKey && !chapters.has(x.chapterKey)) {
+                            chapters.set(x.chapterKey, x.chapterLabel);
+                        }
+                    });
+                    sections = Array.from(chapters.entries())
+                        .map(([id, text]) => ({ id: id, lv: 1, text: text }))
+                        .sort((x, y) => String(x.text).localeCompare(String(y.text)));
+                };
+                rebuildRows();
+                /* v1.2.11：当前层级一条题注都没有 → 自动往更宽的一级试探，窗口照常弹。
+                 * 典型复现：文档 rootNum 只有 "1.1" 两段，却记住了第 3 级，链键算不出 →
+                 * rows 为空；升到第 2 级就能看到本文档的「图 1-1」。
+                 * 只自动到 1 级，绝不自动跨到 0 级（跨笔记本必须用户主动选）。
+                 * 自动放宽只影响本次面板，不写回 settings.pickerLevel，不污染记住的选择。 */
+                if (!rows.length && levelList.length) {
+                    const widened = xrPickerFirstNonEmptyLevel(
+                        allRows, levelKeys, levelList, curLevel, false);
+                    if (widened.level !== curLevel) {
+                        curLevel = widened.level;
+                        rebuildRows();
+                    }
+                    // 放宽后仍一条都没有 → 别谎报「已找到」，明确引导手动切 0 级
+                    widenNote = widened.found
+                        ? tr("picker.autoWiden", curLevel === 0
+                            ? tr("picker.level0") : tr("picker.levelN", curLevel))
+                        : tr("picker.widenNone");
+                }
+                defaultChapter = "";   // 层级已硬过滤，章节下拉默认「当前范围全部」
+                scopeMode = true;
+            } else {
+                // 用 collectFresh 而不是 collectBlocks：面板刚打开时，用户可能刚写完一个题注，
+                // blocks 表索引还没跟上（实测 0.6~2s）→ 采不到它，面板里就少一条。
+                const fresh = await collectFresh(docId, protyle);
+                const built = buildPlan(fresh.blocks, this.settings);
+                rows = built.plan;
+                sections = built.sections || [];
+            }
         } catch (e) {
             await logErr("openPicker:collect", e);
             showMessage(tr("msg.readFail", e && e.message ? e.message : e), 8000, "error");
             return;
         }
-        if (!rows.length) { showMessage(tr("msg.noTargets"), 4000); return; }
+        /* v1.2.11：本文档 / 当前层级没识别到图/表/公式时**也照常弹窗**。
+         * 旧版在这里弹一句「本文档没识别到图/表/公式」就退出，用户连切换范围层级的
+         * 机会都没有 —— 但当前层级空常常只是链太深，往上升一级就有题注了。
+         * 空列表由 render() 里的「没有匹配项」占位承接，↑↓ / Enter 都有空值保护。 */
+        if (!rows.length && !scopeMode) widenNote = tr("picker.emptyScopeOff");
 
         const mask = document.createElement("div");
         mask.className = "xr-mask";
@@ -4330,7 +5715,7 @@ class SiYuanXref extends Plugin {
         const headTx = document.createElement("div");
         headTx.className = "xr-headtx";
         const headTitle = document.createElement("b");
-        headTitle.textContent = tr("picker.title");
+        headTitle.textContent = tr("picker.title") + (scopeMode ? " · " + tr("picker.scope") : "");
         const headSub = document.createElement("span");
         headSub.className = "xr-sub";
         headTx.appendChild(headTitle);
@@ -4359,7 +5744,13 @@ class SiYuanXref extends Plugin {
         const secSel = document.createElement("select");
         secSel.className = "b3-select xr-sec";
         secSel.title = tr("picker.secTip");
+        // v1.2.8：范围层级下拉。级数越小范围越大（1 级 = 可跨篇），
+        // 每一级都严格锁在「同一 rootID + 同一前 L 段链」内。
+        const levelSel = document.createElement("select");
+        levelSel.className = "b3-select xr-sec xr-level";
+        levelSel.title = tr("picker.levelTip");
         tools.appendChild(chipBox);
+        tools.appendChild(levelSel);
         tools.appendChild(secSel);
         const list = document.createElement("div");
         list.className = "xr-list";
@@ -4381,7 +5772,9 @@ class SiYuanXref extends Plugin {
         input.focus();
 
         // 公式行要渲染成真公式（用户 2026-11-01 反馈：别显示 $$ y=1-sin(x) \tag{2-1} $$ 这种源码）
-        const renderMath = await ensureMathRenderer();
+        // v1.2.18：加载 KaTeX 移出关键路径 —— 先出窗口，再异步加载、只重绘一次列表。
+        // 没有公式候选时完全不加载，省掉最多 1.2s 的轮询等待。
+        let renderMath = null;
         /** 一行的右侧预览：公式→渲染，其余→纯文字 */
         const previewOf = (x) => {
             if (x.kind === "eq") {
@@ -4398,14 +5791,28 @@ class SiYuanXref extends Plugin {
             return esc(txt.slice(0, 60)) || "—";
         };
         // ── 筛选：类型（图/表/式） + 所属标题 ────────────────────────────
-        let typeFilter = "";   // "" 全部 | fig | tab | eq
-        let secFilter = "";    // "" 全部 | 标题块 id
+        // v1.2.9：三个筛选控件（类型按钮 / 层级下拉 / 章节下拉）记住上次选择。
+        // 搜索框不在其中：每次打开都清空，免得上次的词把列表挡空。
+        const savedType = ["", "fig", "tab", "eq"].indexOf(this.settings.pickerType) >= 0
+            ? this.settings.pickerType : "";
+        let typeFilter = savedType;
+        let secFilter = "";   // paintSections 之后按可选项校验再恢复
+        const savedSecWanted = String(this.settings.pickerSec || "");
         let items = [];
         let cur = 0;
         /** 章节 + 搜索词都满足的项（不含类型判断）——chip 上的计数用它 */
         const baseRows = () => filterPickerRows(rows, { secId: secFilter, q: input.value });
-        const applyFilter = () => filterPickerRows(rows,
-            { kind: typeFilter, secId: secFilter, q: input.value });
+        const applyFilter = () => {
+            const r = filterPickerRows(rows,
+                { kind: typeFilter, secId: secFilter, q: input.value });
+            // v1.2.18：按思源内置 name（「图 3-1 / 表 3-1 / 式 3-1」）自然序排，
+            // numeric:true 保证「图 3-2」在「图 3-10」前；编号已含章节号，天然分组。
+            if (scopeMode) r.sort((a, b) =>
+                String(a.name || "").localeCompare(String(b.name || ""), undefined,
+                    { numeric: true }) ||
+                String(a.docId || "").localeCompare(String(b.docId || "")));
+            return r;
+        };
 
         const chips = [];
         [["", tr("picker.all")], ["fig", tr("label.fig")],
@@ -4418,6 +5825,8 @@ class SiYuanXref extends Plugin {
                 ev.preventDefault();
                 // 再点一次当前类型 = 取消，回到全部
                 typeFilter = (k && typeFilter !== k) ? k : "";
+                this.settings.pickerType = typeFilter;
+                this.savePickerState();
                 refresh();
             });
             chips.push({ el: chip, kind: k, label: label });
@@ -4434,32 +5843,75 @@ class SiYuanXref extends Plugin {
             });
         };
 
-        // 章节下拉：只列「真的有图/表/式」的标题，免得长文档里一整屏都是空节
-        const secIds = new Set();
-        rows.forEach((x) => { if (x.hPath) x.hPath.split("/").forEach((id) => secIds.add(id)); });
-        const optAll = document.createElement("option");
-        optAll.value = "";
-        optAll.textContent = tr("picker.allSec");
-        secSel.appendChild(optAll);
-        let secCount = 0;
-        sections.forEach((sec) => {
-            if (!secIds.has(sec.id)) return;
-            const opt = document.createElement("option");
-            opt.value = sec.id;
-            // H2 缩进两格 → 一眼看出层级，跟思源大纲的缩进习惯一致
-            opt.textContent = "H" + sec.lv + " " + new Array(Math.max(0, sec.lv)).join("\u3000") +
-                (sec.text || tr("picker.secNone"));
-            secSel.appendChild(opt);
-            secCount += 1;
-        });
-        // 整篇一个标题都没有（纯图片集 / 单节文档）：藏起来，别白占一行
-        if (!secCount) secSel.style.display = "none";
+        // 章节下拉：只列「真的有图/表/式」的标题，免得长文档里一整屏都是空节。
+        // v1.2.8：切范围层级后要重建，抽成函数。
+        const paintSections = () => {
+            const secIds = new Set();
+            rows.forEach((x) => { if (x.hPath) x.hPath.split("/").forEach((id) => secIds.add(id)); });
+            secSel.innerHTML = "";
+            const optAll = document.createElement("option");
+            optAll.value = "";
+            // 「全部」只指当前范围层级内的全部章节，绝不代表跨范围
+            optAll.textContent = scopeMode ? tr("picker.allInLevel") : tr("picker.allSec");
+            secSel.appendChild(optAll);
+            let secCount = 0;
+            sections.forEach((sec) => {
+                if (!secIds.has(sec.id)) return;
+                const opt = document.createElement("option");
+                opt.value = sec.id;
+                // H2 缩进两格 → 一眼看出层级，跟思源大纲的缩进习惯一致
+                opt.textContent = scopeMode
+                    ? (sec.text || tr("picker.secNone"))
+                    : "H" + sec.lv + " " + new Array(Math.max(0, sec.lv)).join("\u3000") +
+                        (sec.text || tr("picker.secNone"));
+                secSel.appendChild(opt);
+                secCount += 1;
+            });
+            // 整篇一个标题都没有（纯图片集 / 单节文档）：藏起来，别白占一行
+            secSel.style.display = secCount ? "" : "none";
+            secSel.value = "";
+        };
+        paintSections();
+        // v1.2.9：恢复上次选的章节（只在该章节这次真的存在时），否则保持「当前范围全部」
+        const secIdsNow = Array.prototype.slice.call(secSel.options).map((o) => o.value);
+        secFilter = xrPickerSavedSec(savedSecWanted, secIdsNow);
+        if (secFilter) secSel.value = secFilter;
+        this.settings.pickerSec = secFilter;
         secSel.addEventListener("change", () => {
             secFilter = secSel.value;
+            this.settings.pickerSec = secFilter;
+            this.savePickerState();
             refresh();
         });
         // 下拉会把焦点抢走，选完还给输入框，否则 ↑↓ / Enter 全失效
         secSel.addEventListener("blur", () => { try { input.focus(); } catch (e) { /* 忽略 */ } });
+
+        // v1.2.9 范围层级下拉：0 = 跨所有笔记本；1..n 每级锁 rootID | 前 L 段链。
+        // 级数越小范围越大；0 是唯一能跨笔记本的一档（用户主动选）。
+        if (scopeMode && levelList.length) {
+            levelList.forEach((L) => {
+                const opt = document.createElement("option");
+                opt.value = String(L);
+                const n = xrPickerRowsInLevel(allRows, levelKeys.get(L) || "", L).length;
+                opt.textContent = (L === 0 ? tr("picker.level0") : tr("picker.levelN", L)) + " · " + n;
+                if (L === curLevel) opt.selected = true;
+                levelSel.appendChild(opt);
+            });
+            levelSel.addEventListener("change", () => {
+                curLevel = Number(levelSel.value) || 0;   // 0 是合法值，不能 || curLevel
+                widenNote = "";   // v1.2.11：用户已手动选档，自动放宽的说明作废
+                if (rebuildRows) rebuildRows();
+                secFilter = "";
+                paintSections();
+                this.settings.pickerLevel = curLevel;
+                this.settings.pickerSec = "";
+                this.savePickerState();
+                refresh();
+            });
+            levelSel.addEventListener("blur", () => { try { input.focus(); } catch (e) { /* 忽略 */ } });
+        } else {
+            levelSel.style.display = "none";
+        }
 
         const render = () => {
             list.innerHTML = "";
@@ -4471,10 +5923,16 @@ class SiYuanXref extends Plugin {
                 return;
             }
             items.forEach((x, i) => {
+                /* v1.2.10：去掉单独占一行的文档名分组标题（列表显乱），
+                 * 文档名改到本行最右侧；范围模式才显示（单文档模式只有一篇，显示无意义）。 */
+                const docName = scopeMode
+                    ? String(x.chapterLabel || x.docTitle || "").trim() : "";
                 const it = document.createElement("div");
                 it.className = "xr-item" + (i === cur ? " xr-cur" : "");
                 it.innerHTML = '<span class="xr-name">' + esc(x.name) + "</span>" +
-                    '<span class="xr-preview">' + previewOf(x) + "</span>";
+                    '<span class="xr-preview">' + previewOf(x) + "</span>" +
+                    (docName ? '<span class="xr-doc" title="' + esc(docName) + '">' +
+                        esc(docName) + "</span>" : "");
                 it.addEventListener("mousedown", (ev) => { ev.preventDefault(); pick(x); });
                 it.addEventListener("mousemove", () => {
                     if (cur !== i) { cur = i; render(); }
@@ -4527,11 +5985,15 @@ class SiYuanXref extends Plugin {
                 try { document.execCommand("insertHTML", false, html); }
                 catch (e2) { showMessage(tr("msg.insertFail", e && e.message ? e.message : e), 6000, "error"); return; }
             }
+            // v1.2.16：在已有文字后面插入时，思源会把 <span data-type="block-ref">
+            // 降级成 <span data-type="text" style="white-space: normal">（纯文本）。
+            // 插完自检，降级就用整块 dom 写回修正（实测整块 DOM 写入能保留 ((id "锚"))）。
+            fixInlineRef(anchorId, x.id, x.name);
 
         };
         const onKey = (ev) => {
-            // 章节下拉自己要用方向键，别在这里截走
-            if (ev.target === secSel) return;
+            // 章节/层级下拉自己要用方向键，别在这里截走
+            if (ev.target === secSel || ev.target === levelSel) return;
             if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); close(); return; }
             if (ev.key === "ArrowDown") { ev.preventDefault(); cur = Math.min(cur + 1, items.length - 1); render(); return; }
             if (ev.key === "ArrowUp") { ev.preventDefault(); cur = Math.max(cur - 1, 0); render(); return; }
@@ -4551,12 +6013,28 @@ class SiYuanXref extends Plugin {
             // 头部副标题 + 底栏计数：筛选条件一变就跟着走，一眼知道「现在是哪一类、多少条」
             const label = typeFilter ? tr("label." + typeFilter) : tr("picker.all");
             const secNow = secSel.selectedOptions && secSel.selectedOptions[0];
-            headSub.textContent = (secFilter && secNow) ? label + " · " + secNow.textContent.trim() : label;
+            // v1.2.11：记住的类型把结果全筛掉时，明确告诉用户「点全部就能看到」，
+            // 但不擅自改掉他记住的选择（状态持久化仍生效）。
+            const hidden = (!items.length && typeFilter) ? baseRows().length : 0;
+            const typeHint = hidden > 0 ? tr("picker.typeEmptyHint", hidden) : "";
+            headSub.textContent = ((secFilter && secNow)
+                ? label + " · " + secNow.textContent.trim() : label) +
+                (widenNote ? " · " + widenNote : "") +
+                (typeHint ? " · " + typeHint : "");
             footCount.textContent = String(items.length);
         };
         input.addEventListener("input", refresh);
         mask.addEventListener("mousedown", (ev) => { if (ev.target === mask) close(); });
-        refresh();
+        refresh();   // 先同步出窗口，不让 KaTeX 挡住
+
+        // v1.2.18：窗口已可见，再慢慢渲染公式；完成后只重绘一次列表。
+        if (rows.some((x) => x.kind === "eq") || allRows.some((x) => x.kind === "eq")) {
+            ensureMathRenderer().then((fn) => {
+                if (!fn || !document.body.contains(mask)) return;
+                renderMath = fn;
+                render();
+            }).catch(() => { /* 渲染不出来就保持 LaTeX 源码 */ });
+        }
     }
 }
 
@@ -4586,5 +6064,23 @@ SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyP
     eqTex: eqTex, ensureMathRenderer: ensureMathRenderer, resetMathRenderer: resetMathRenderer,
     headingText: headingText, filterPickerRows: filterPickerRows,
     ialValue: ialValue, restoreDeadInMd: restoreDeadInMd, countRestored: countRestored,
-    prefixKind: prefixKind, NUM_HEAD: NUM_HEAD, captionLabelList: captionLabelList };
+    prefixKind: prefixKind, NUM_HEAD: NUM_HEAD, captionLabelList: captionLabelList,
+    // v1.1.0 多文档范围重排纯函数（离线可测）
+    xrScopeResolve: xrScopeResolve, xrScopeDocTag: xrScopeDocTag,
+    xrScopeAnchor: xrScopeAnchor, xrScopeRefs: xrScopeRefs,
+    xrScopeShouldRun: xrScopeShouldRun, xrBuildScopePlan: xrBuildScopePlan,
+    xrMapLimit: xrMapLimit, XR_REF_RE: XR_REF_RE,
+    xrDecodeIalText: xrDecodeIalText, xrParseMeta: xrParseMeta,
+    xrScopePrefix: xrScopePrefix,
+    xrLevelChain: xrLevelChain, xrDocsInChain: xrDocsInChain,
+    xrChainKeyFromMeta: xrChainKeyFromMeta, xrDocChainKey: xrDocChainKey,
+    xrLevelForDoc: xrLevelForDoc, xrPickerLevel: xrPickerLevel,
+    xrPickerOverrides: xrPickerOverrides,
+    xrPickerRowsInLevel: xrPickerRowsInLevel, xrPickerLevelList: xrPickerLevelList,
+    xrPickerDefaultLevel: xrPickerDefaultLevel,
+    xrPickerSavedLevel: xrPickerSavedLevel, xrPickerSavedSec: xrPickerSavedSec,
+    xrPickerFirstNonEmptyLevel: xrPickerFirstNonEmptyLevel,
+    xrScopeSqlBlocks: xrScopeSqlBlocks, xrScopeCollectDocs: xrScopeCollectDocs,
+    xrScopePickNeed: xrScopePickNeed, orderFromDocOrders: orderFromDocOrders,
+    updateRefAnchors: updateRefAnchors, isAutoCaptionName: isAutoCaptionName };
 module.exports = SiYuanXref;
