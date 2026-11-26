@@ -1,4 +1,4 @@
-# Figure, Table & Equation Cross-Reference (siyuan-xref) v1.2.18
+# Figure, Table & Equation Cross-Reference (siyuan-xref) v1.2.21
 
 
 **Chinese**: [README.md](./README.md) ｜ Install: SiYuan → Settings → Marketplace → Plugins → search "图表公式交叉引用" or `xref`
@@ -30,7 +30,7 @@ Three things it does for you:
 | Table | Start of a standalone paragraph: `Table 1-1 experimental design` | Same |
 | Equation | Inside the formula: `\tag{2}` | Replaces only the `\tag{…}` within `data-content`; the formula never goes through Lute and the block is never rebuilt |
 
-- **Two numbering modes**: continuous across the document (Figure 1, 2, 3) or per chapter (switching at the shallowest heading level, Figure 1-1, 2-1).
+- **Two single-document numbering modes**: continuous across the document (Figure 1, 2, 3) or per chapter (switching at the shallowest heading level, Figure 1-1, 2-1). Applies only to standalone documents without `custom-doc-num-meta`; documents inside a book are always numbered continuously within the document.
 - **Labels are configurable**: default 图 / 表 / 式, changeable to `Figure` / `Table` / `Eq` or anything else; the numbering logic is unchanged.
 - **Automatic trigger**: a run is scheduled about 1.5 s after you stop typing and usually lands within 1–3 s, silently.
 - **Manual trigger**: `Ctrl+Alt+N` or `/xrefnum`, any time, whole document.
@@ -126,6 +126,8 @@ A figure or a table **cannot be its own caption block** — writing a number int
 - Kind, section and search **stack on top of each other**: with a hundred captions, click Table, pick chapter 3, then choose from the two or three rows left.
 - Keyboard habits are unchanged: `↑↓` to select, `Enter` to insert, `Esc` to close — the buttons are mouse-only and never steal focus.
 - Since v1.2.18: candidates are sorted by the built-in `name` in **natural order** (`Figure 3-2` before `Figure 3-10`); equation rows show LaTeX source first and render asynchronously after the panel is visible, so KaTeX loading never blocks the picker.
+- Since v1.2.19: when the document has **no** `custom-doc-num-meta` (it is not a book or book sub-document), the picker runs in **single-document mode** and lists every caption of this document; no "· Scope" header and no level dropdown. Scope filtering applies only to documents that really carry the attribute.
+- Since v1.2.20: **Numbering mode** applies only to standalone documents. Documents inside a book are always continuous within the document: with the by-document prefix (bydoc) they use the chapter number at the configured scope level; with whole-book continuous numbering (continuous) the single-document pass does not write numbers at all and hands over to the scope round (debounced, silent, incremental cache), so it can never write wrong `1..n` numbers.
 
 ---
 
@@ -293,7 +295,7 @@ Settings live under **Settings → Marketplace → Downloaded → Figure, Table 
 
 | Option | Default | Notes |
 |---|---|---|
-| Numbering mode | Continuous | Continuous across the document (Figure 1, 2) or per chapter (Figure 1-1, 2-1, switching at the shallowest heading level) |
+| Single-document numbering | Continuous | Continuous across the document (Figure 1, 2) or per chapter (Figure 1-1, 2-1, switching at the shallowest heading level); standalone documents only — book documents stay continuous within the document |
 | Labels | 图 / 表 / 式 | Caption prefixes; can be set to `Figure` / `Table` / `Eq` |
 | Refresh references while renumbering | On | Off = only numbers change, existing references are left alone |
 | Auto renumber | On | Fires about 1.5 s after you stop typing; never writes into the block holding the caret |
@@ -423,7 +425,7 @@ Right-click a paragraph / image / table → the top of the menu:
 
 ### 7.8 Per-chapter numbering (Figure 1-1)
 
-1. Settings → Numbering mode → **per chapter**.
+1. Settings → Single-document numbering → **per chapter** (standalone documents only).
 2. Chapters switch at the **shallowest heading level** in the document: if it only uses `##`, chapters break at `##`; if it uses both `#` and `##`, they break at `#`.
 3. Existing "Figure 1" becomes "Figure 1-1" on the next run, and references are refreshed.
 
@@ -568,6 +570,12 @@ MIT License © 2026 ttChen
 ---
 
 ## 12 Changelog
+
+**v1.2.21**: fixed block-type routing in the right-click menu. A paragraph that contains an inline image (especially an empty `src=""` placeholder) is no longer treated as a pure image block, so "Insert cross-reference…" is back when right-clicking the text; headings and list items now also get "Insert cross-reference…" in the body right-click menu (reference only, no caption); pure image paragraphs still show only caption actions. Added 11 offline test cases.
+
+**v1.2.20**: numbering rules now depend on whether the document is in a book, which resolves the conflict between "standalone documents need per-heading chapters" and "book documents must stay continuous within the document". `mode` (continuous / per chapter) applies only to standalone documents without `custom-doc-num-meta`. Documents inside a book are always continuous within the document: with the by-document prefix (bydoc) they use the chapter number at the configured scope level (e.g. `Table 4-1`); with whole-book continuous numbering (continuous) the single-document pass no longer writes numbers locally and hands over to the scope round (debounced, silent, incremental cache), so it can never write wrong `1..n` numbers. The setting "Numbering mode" is renamed "Single-document numbering (not in a book)"; descriptions updated in 10 languages; a new toast explains why a book document renumbers the whole scope. No new settings keys and no migration.
+
+**v1.2.19**: fixed "the cross-reference picker cannot find the current document". Root cause: the picker only checked `scopeEnabled`; for a document without `custom-doc-num-meta` (not a book or book sub-document) the scope chain key was empty, `xrPickerRowsInLevel()` dropped every candidate, and the auto-widen loop only walks levels 1..n, so the list was empty. The picker now reads the **document's own** attribute first: a valid `rootNum` means scope mode; missing or invalid means **single-document mode** (`collectFresh` + `buildPlan`) listing all captions of this document, with numbering identical to single-document renumbering and no "· Scope" header or level dropdown. The old "walk up `path` to a numbered ancestor" fallback is removed (an ancestor's number is not this document's number and could not rescue its rows). Boundary: only the document's own attribute is considered, so a new sub-document that has not been numbered yet also runs in single-document mode; scope renumbering, numbering rules and UI structure are unchanged.
 
 **v1.2.18**: (1) Settings are split into two collapsible sections — "Single document (general)" and "Book / multi-document (scope)", with the eight scope options folded by default; both JSON textareas are now full-width and about four lines tall, descriptions were rewritten as short accurate one-to-two-line hints, and spacing / section accents are consistent. (2) Batch kernel APIs — `getBlockDOMs`, `checkBlocksExist`, `batchUpdateBlock`, `batchSetBlockAttrs` — replace per-block calls, with automatic per-block fallback; measured 3.0x / 37.7x on reads. (3) Scope collection fetches only the blocks actually needed (filtered SQL with a full-scan fallback): 40 documents, 1011 blocks / 24.33 ms -> 257 blocks / 6.15 ms (~4x). (4) The picker now uses a single `attributes` SQL query instead of walking the document tree, sorts by the built-in `name` in natural order, and renders KaTeX asynchronously after the panel is visible; measured 3.14 ms / 87 rows. (5) Fixed three regressions: inline right-click inserts degraded to plain text, batch writes overwrote `name` / `style` attributes, and the fast picker path dropped caption previews. (6) The companion plugin has been renamed to [Tree Document Numbering](https://github.com/taotaochen86/tree-doc-numbering). This release ships every local iteration since v1.0.11 at once; no migration and no settings changes needed.
 

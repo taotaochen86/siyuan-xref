@@ -1,8 +1,12 @@
 # 构建产物与本地备份，不进版本库
-package.zip
+package*.zip
 dist/
 .bak/
 node_modules/
+test/dryrun-result.json
+
+# 依赖本机 1.0.11 备份，未纳入仓库
+test/single_doc_regression.test.js
 
 # 系统与编辑器杂项
 .DS_Store

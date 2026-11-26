@@ -57,6 +57,7 @@ const UI_TEXT = {
         "msg.scope.readfail": "范围采集失败，整批未写入：{0}",
         "msg.scope.limit": "范围含 {0} 篇文档，超过安全上限，已中止",
         "msg.scope.nodn": "树文联动编号插件未加载，已退回自定义范围",
+        "msg.scope.bookmode": "本文档在书籍范围内（全书连续编号），已改为重排整个范围",
 
         // 右键菜单
         "menu.setFig": "设为图题注", "menu.setTab": "设为表题注",
@@ -88,8 +89,8 @@ const UI_TEXT = {
         "set.grp.adv": "高级",
 
         // 设置面板：描述一律压到一到两行 —— 右侧被控件占着，长句会被压出遮挡
-        "set.mode.title": "编号模式",
-        "set.mode.desc": "全文连续（图 1、图 2）或按标题分章（图 1-1、图 2-1）",
+        "set.mode.title": "单文档编号模式（未加入书籍）",
+        "set.mode.desc": "只对没有 custom-doc-num-meta 的独立文档生效：全文连续（图 1、图 2）或按一级标题分章（图 1-1、图 2-1）；书籍文档始终文内连续",
         "set.mode.continuous": "全文连续", "set.mode.chapter": "按章编号",
         "set.labels.title": "图 / 表 / 式 标签",
         "set.labels.desc": "题注前缀文字，可填 Figure / Table / Eq",
@@ -215,6 +216,7 @@ const UI_TEXT = {
         "msg.scope.readfail": "Scope collection failed, nothing was written: {0}",
         "msg.scope.limit": "Scope has {0} docs, over the safety limit, aborted",
         "msg.scope.nodn": "Doc-numbering plugin not loaded, falling back to custom scope",
+        "msg.scope.bookmode": "This document is in a book with continuous numbering; renumbering the whole scope instead",
 
         "menu.setFig": "Set as figure caption", "menu.setTab": "Set as table caption",
         "menu.clear": "Clear caption",
@@ -243,8 +245,8 @@ const UI_TEXT = {
         "set.grp.keys": "Hotkeys",
         "set.grp.adv": "Advanced",
 
-        "set.mode.title": "Numbering mode",
-        "set.mode.desc": "Continuous through the document (Figure 1, 2) or restart at every heading (Figure 1-1)",
+        "set.mode.title": "Single-document numbering",
+        "set.mode.desc": "Applies only to standalone documents without custom-doc-num-meta: continuous (Figure 1, 2) or restart at each top-level heading (Figure 1-1); book documents are always continuous within the document",
         "set.mode.continuous": "Continuous", "set.mode.chapter": "Per chapter",
         "set.labels.title": "Figure / table / equation labels",
         "set.labels.desc": "Text written in front of each number, e.g. Figure / Table / Eq",
@@ -355,7 +357,7 @@ const UI_TEXT = {
         "set.grp.look": "題註外觀",
         "set.grp.keys": "快速鍵",
         "set.grp.adv": "進階",
-        "set.mode.title": "編號模式", "set.mode.desc": "全文連續（圖 1、圖 2）或依一級標題分章（圖 1-1、圖 2-1）",
+        "set.mode.title": "單文件編號模式（未加入書籍）", "set.mode.desc": "只對沒有 custom-doc-num-meta 的獨立文件生效：全文連續（圖 1、圖 2）或依一級標題分章（圖 1-1、圖 2-1）；書籍文件始終文內連續",
         "set.mode.continuous": "全文連續", "set.mode.chapter": "依章編號",
         "set.labels.title": "圖／表／式 標籤", "set.labels.desc": "題註前置文字，例如填 Figure / Table / Eq",
         "set.refs.title": "重排時同步更新引用", "set.refs.desc": "把 ((區塊ID \"舊錨文字\")) 全部改成新編號。關閉後只改編號不動引用",
@@ -425,7 +427,7 @@ const UI_TEXT = {
         "set.grp.look": "キャプションの外観",
         "set.grp.keys": "ショートカット",
         "set.grp.adv": "詳細設定",
-        "set.mode.title": "番号の付け方", "set.mode.desc": "文書全体で連番（図 1、図 2）または最上位の見出しごとに振り直す（図 1-1、図 2-1）",
+        "set.mode.title": "単一文書の番号付け", "set.mode.desc": "custom-doc-num-meta のない独立文書のみ対象：文書全体で連番（図 1、図 2）または最上位見出しごとに振り直し（図 1-1）；書籍の文書は常に文内で連番",
         "set.mode.continuous": "全体で連番", "set.mode.chapter": "見出しごと",
         "set.labels.title": "図 / 表 / 式 のラベル", "set.labels.desc": "番号の前に付ける文字。例：Figure / Table / Eq",
         "set.refs.title": "振り直し時に参照も更新", "set.refs.desc": "((ブロックID \"旧アンカー\")) をすべて新しい番号に書き換えます。オフにすると番号だけ変わり、参照はそのままです",
@@ -495,7 +497,7 @@ const UI_TEXT = {
         "set.grp.look": "캡션 모양",
         "set.grp.keys": "단축키",
         "set.grp.adv": "고급",
-        "set.mode.title": "번호 매기기 방식", "set.mode.desc": "문서 전체 연속(그림 1, 그림 2) 또는 최상위 제목마다 새로 시작(그림 1-1, 그림 2-1)",
+        "set.mode.title": "단일 문서 번호 방식", "set.mode.desc": "custom-doc-num-meta가 없는 독립 문서에만 적용: 전체 연속(그림 1, 그림 2) 또는 최상위 제목마다 새로 시작(그림 1-1); 책 문서는 항상 문서 내 연속",
         "set.mode.continuous": "전체 연속", "set.mode.chapter": "장마다",
         "set.labels.title": "그림 / 표 / 식 라벨", "set.labels.desc": "번호 앞에 붙는 글자. 예: Figure / Table / Eq",
         "set.refs.title": "번호를 다시 매길 때 참조도 갱신", "set.refs.desc": "((블록ID \"이전 앵커\"))를 모두 새 번호로 바꿉니다. 끄면 번호만 바뀌고 참조는 그대로 둡니다",
@@ -565,7 +567,7 @@ const UI_TEXT = {
         "set.grp.look": "Beschriftungsstil",
         "set.grp.keys": "Tastenkürzel",
         "set.grp.adv": "Erweitert",
-        "set.mode.title": "Nummerierungsmodus", "set.mode.desc": "Durchlaufend im ganzen Dokument (Abb. 1, Abb. 2) oder neu ab jeder Überschriftenebene (Abb. 1-1, Abb. 2-1)",
+        "set.mode.title": "Nummerierung einzelner Dokumente", "set.mode.desc": "Nur für eigenständige Dokumente ohne custom-doc-num-meta: durchlaufend (Abb. 1, 2) oder neu ab jeder Überschrift der ersten Ebene (Abb. 1-1); Buchdokumente werden immer dokumentintern durchlaufend nummeriert",
         "set.mode.continuous": "Durchlaufend", "set.mode.chapter": "Pro Kapitel",
         "set.labels.title": "Beschriftungstexte für Abbildung / Tabelle / Gleichung", "set.labels.desc": "Text vor der Nummer, z. B. Abb. / Tab. / Gl.",
         "set.refs.title": "Verweise beim Neuvergeben aktualisieren", "set.refs.desc": "Schreibt jedes ((Block-ID \"alter Anker\")) auf die neue Nummer um. Ausschalten ändert nur die Nummern und lässt Verweise unberührt.",
@@ -635,7 +637,7 @@ const UI_TEXT = {
         "set.grp.look": "Apparence des légendes",
         "set.grp.keys": "Raccourcis",
         "set.grp.adv": "Avancé",
-        "set.mode.title": "Mode de numérotation", "set.mode.desc": "Continu sur tout le document (Fig. 1, Fig. 2) ou redémarrage à chaque titre de premier niveau (Fig. 1-1, Fig. 2-1)",
+        "set.mode.title": "Numérotation des documents isolés", "set.mode.desc": "Uniquement pour les documents autonomes sans custom-doc-num-meta : continu (Fig. 1, 2) ou redémarrage à chaque titre de premier niveau (Fig. 1-1) ; les documents de livre restent continus dans le document",
         "set.mode.continuous": "Continu", "set.mode.chapter": "Par chapitre",
         "set.labels.title": "Libellés figure / tableau / équation", "set.labels.desc": "Texte placé devant chaque numéro, par ex. Fig. / Tab. / Éq.",
         "set.refs.title": "Actualiser les références lors de la renumérotation", "set.refs.desc": "Réécrit chaque ((id de bloc \"ancien ancrage\")) avec le nouveau numéro. Désactivez pour ne changer que les numéros et laisser les références intactes.",
@@ -705,7 +707,7 @@ const UI_TEXT = {
         "set.grp.look": "Aspecto de las leyendas",
         "set.grp.keys": "Atajos",
         "set.grp.adv": "Avanzado",
-        "set.mode.title": "Modo de numeración", "set.mode.desc": "Continuo en todo el documento (Fig. 1, Fig. 2) o reiniciando en cada título de primer nivel (Fig. 1-1, Fig. 2-1)",
+        "set.mode.title": "Numeración de documentos sueltos", "set.mode.desc": "Solo para documentos independientes sin custom-doc-num-meta: continuo (Fig. 1, 2) o reinicio en cada título de primer nivel (Fig. 1-1); los documentos de libro siempre son continuos dentro del documento",
         "set.mode.continuous": "Continuo", "set.mode.chapter": "Por capítulo",
         "set.labels.title": "Etiquetas de figura / tabla / ecuación", "set.labels.desc": "Texto que se escribe delante de cada número, p. ej. Fig. / Tab. / Ec.",
         "set.refs.title": "Actualizar referencias al renumerar", "set.refs.desc": "Reescribe cada ((id de bloque \"ancla antigua\")) con el nuevo número. Desactívalo para cambiar solo los números y dejar las referencias intactas.",
@@ -775,7 +777,7 @@ const UI_TEXT = {
         "set.grp.look": "Вид подписей",
         "set.grp.keys": "Горячие клавиши",
         "set.grp.adv": "Дополнительно",
-        "set.mode.title": "Режим нумерации", "set.mode.desc": "Сквозная по всему документу (Рис. 1, Рис. 2) или с нового раздела на каждом заголовке первого уровня (Рис. 1-1, Рис. 2-1)",
+        "set.mode.title": "Нумерация отдельного документа", "set.mode.desc": "Только для самостоятельных документов без custom-doc-num-meta: сквозная (Рис. 1, 2) или с нового раздела на каждом заголовке первого уровня (Рис. 1-1); документы книги всегда нумеруются сквозняком внутри документа",
         "set.mode.continuous": "Сквозная", "set.mode.chapter": "По разделам",
         "set.labels.title": "Метки рисунка / таблицы / формулы", "set.labels.desc": "Текст перед номером, например Рис. / Табл. / Форм.",
         "set.refs.title": "Обновлять ссылки при перенумерации", "set.refs.desc": "Переписывает каждую ((ID блока \"старый якорь\")) на новый номер. Выключите, чтобы менять только номера и не трогать ссылки.",
@@ -845,7 +847,7 @@ const UI_TEXT = {
         "set.grp.look": "Aparência das legendas",
         "set.grp.keys": "Atalhos",
         "set.grp.adv": "Avançado",
-        "set.mode.title": "Modo de numeração", "set.mode.desc": "Contínuo no documento inteiro (Fig. 1, Fig. 2) ou reiniciando a cada título de primeiro nível (Fig. 1-1, Fig. 2-1)",
+        "set.mode.title": "Numeração de documento único", "set.mode.desc": "Apenas para documentos independentes sem custom-doc-num-meta: contínuo (Fig. 1, 2) ou reinício em cada título de primeiro nível (Fig. 1-1); documentos de livro são sempre contínuos dentro do documento",
         "set.mode.continuous": "Contínuo", "set.mode.chapter": "Por capítulo",
         "set.labels.title": "Rótulos de figura / tabela / equação", "set.labels.desc": "Texto colocado antes de cada número, por exemplo Fig. / Tab. / Eq.",
         "set.refs.title": "Atualizar referências ao renumerar", "set.refs.desc": "Reescreve cada ((id do bloco \"âncora antiga\")) com o novo número. Desative para mudar apenas os números e deixar as referências intactas.",
@@ -1560,6 +1562,27 @@ function inTableCell(el) {
     } catch (e) { return false; }
 }
 
+/** 段落里去掉图片/块标/属性后的纯文字；用来区分「纯图片段落」和「文字里夹了张图」 */
+function blockPlainText(el) {
+    try {
+        if (!el) return "";
+        let txt = "";
+        if (el.cloneNode) {
+            const c = el.cloneNode(true);
+            if (c.querySelectorAll) {
+                c.querySelectorAll('[data-type="img"], [data-type="NodeImage"], .img, .protyle-action, .protyle-attr')
+                    .forEach((n) => n.remove());
+            }
+            txt = c.textContent || "";
+        } else {
+            txt = el.textContent || "";
+        }
+        return txt.replace(/\u200b/g, "").trim();
+    } catch (e) {
+        try { return String((el && el.textContent) || "").replace(/\u200b/g, "").trim(); } catch (e2) { return ""; }
+    }
+}
+
 function domBlockMeta(el) {
     if (!el) return null;
     // 已经是 {id,type} 形态（单测、或未来思源改结构）直接放行
@@ -1590,6 +1613,16 @@ function domBlockMeta(el) {
         if (el.querySelector) img = !!el.querySelector('[data-type="img"], [data-type="NodeImage"], .img');
         if (!img && el.classList) img = el.classList.contains("img");
     } catch (e) { /* 拿不到就按段落处理，最多少拦一次 */ }
+    // v1.2.21：段落里只要有图，旧逻辑就把整段当图片块，导致「文字 + 一个空图」的
+    // 普通段落也只剩「在下方添加图题注」，没有「插入交叉引用」。
+    // 这里再看一眼去掉图片后的纯文字：还有字就按段落走（mixedImg），只有图才是图片块。
+    if (type === "p" && img) {
+        const plain = blockPlainText(el);
+        if (plain) {
+            return { id: id, type: "p", img: false, mixedImg: true, text: plain,
+                typeName: dt, el: el, tbl: tbl };
+        }
+    }
     return { id: id, type: type, img: img, typeName: dt, el: el, tbl: tbl };
 }
 
@@ -1694,6 +1727,13 @@ function captionMenu(els, look) {
     if (!list.length) return { ok: false, mode: "none", reason: "empty", items: [] };
     const inCell = list.filter((e) => e.tbl)[0];
     if (inCell) return { ok: false, mode: "none", reason: "table", items: [] };
+    const single = list.length === 1 ? list[0] : null;
+    // v1.2.21：标题 / 列表项只给「插入交叉引用」，不给题注。
+    // 之前它们被 isPara 判成媒体块，结果正文右键一项都不出；README 里
+    // 明确写了「段落、标题、列表项的文字上右键都有」，这里把口径补回来。
+    if (single && (single.mixedImg || single.type === "h" || single.type === "i")) {
+        return { ok: false, mode: "ref", reason: single.mixedImg ? "mixedimg" : "type:" + single.type, items: [] };
+    }
     const isPara = (e) => !e.img && (!e.type || e.type === "p");
     const media = list.filter((e) => !isPara(e));
     if (media.length && media.length !== list.length) {
@@ -2304,6 +2344,33 @@ function xrParseMeta(ial) {
         const o = JSON.parse(xrDecodeIalText(m[1]));
         return o && typeof o === "object" ? o : null;
     } catch (e) { return null; }
+}
+/** 纯函数 v1.2.19：本文档是否属于书籍 / 书籍子文档的编号范围。
+ *  只看文档**自身**的 custom-doc-num-meta：缺失、坏值、rootNum 不是合法多段号
+ *  （如新文档刚建、编号插件还没写属性）→ false = 按单文档模式走。
+ *  不再沿 path 找祖先：父章节有号、本文档没号时，本文档的题注在范围过滤里
+ *  链键算不出，会被整篇筛掉（用户 2026-11-21 报「交叉引用找不到本文档」的根因）。 */
+function xrDocInBook(meta) {
+    if (!meta || typeof meta !== "object") return false;
+    return /^\d+(?:\.\d+)*$/.test(String(meta.rootNum || ""));
+}
+/** 纯函数 v1.2.20：按本文档 meta 决定单文档重排的编号口径。
+ *  - 不在书里：原样返回 settings，mode（continuous/chapter）由用户决定。
+ *  - 在书里 + bydoc：强制文内连续，附加范围口径的第 N 级章节号（层级不够则不加）。
+ *  - 在书里 + continuous：返回 scopeRound=true，调用方改走范围轮（全局起点只有范围轮知道）。 */
+function xrPlanSettingsForDoc(settings, meta) {
+    const s = settings || {};
+    const inBook = !!s.scopeEnabled && xrDocInBook(meta);
+    if (!inBook) return { inBook: false, scopeRound: false, planSettings: s };
+    const base = Object.assign({}, s, { mode: "continuous" });
+    if ((s.scopeMode || "bydoc") === "continuous") {
+        return { inBook: true, scopeRound: true, planSettings: base };
+    }
+    const prefix = xrScopePrefix(meta.rootNum,
+        xrLevelForDoc({ meta: meta }, s.scopePrefixLevel, s.scopePrefixLevelByTarget));
+    if (prefix === "") base.__scopeNoPrefix = true;
+    else if (prefix) base.__scopePrefix = prefix;
+    return { inBook: true, scopeRound: false, planSettings: base };
 }
 /** 一次 SQL（按 root_id 分批，避免 IN 过长）拿范围内插件真正会用到的块，含文档块自身的 ial。
  *  v1.2.15：实测 40 篇文档，全量 1013 块/29ms → 过滤后 257 块/7.5ms。
@@ -4115,13 +4182,15 @@ class SiYuanXref extends Plugin {
         };
         const r = captionMenu(els, look);
         // 「插入交叉引用…」给谁（2026-11-01 用户第三次明确）：
-        //   ✅ 正文文字上右键 —— 普通段落、标题、列表项（mode === "para"），以及表格单元格里的文字。
+        //   ✅ 正文文字上右键 —— 普通段落（mode === "para"）、标题/列表项/文字夹图（mode === "ref"），
+        //      以及表格单元格里的文字。
         //      引用是写在文字中间的动作，入口就该在文字右键里。
         //   ❌ 块标（块左侧小图标）菜单不给；❌ 图片/表格本身也不给（那里应该先有题注）。
         // 插在**当前光标处**：openPicker 默认就用选区，绝不传 forceAnchor（传了会定死到块末尾，
         // 反而丢掉用户在单元格里点的位置）。
-        const wantRef = r.ok ? r.mode === "para"
-            : (r.reason === "table" && els.some((x) => !x.img));
+        const wantRef = r.mode === "ref" ? !!quiet
+            : (r.ok ? r.mode === "para"
+                : (r.reason === "table" && els.some((x) => !x.img)));
         const refItem = () => ({
             icon: "iconRef",
             label: tr("menu.ref"),
@@ -4145,7 +4214,7 @@ class SiYuanXref extends Plugin {
             }
             // 公式块 / 混选 / 单元格里的图片：放一条灰掉的说明，让用户知道该右键哪儿，
             // 而不是以为插件没反应。正文右键（quiet）不加：那里已经有思源自己的菜单，再塞一条灰字只是噪音
-            if (!quiet && r.reason && r.reason !== "empty") {
+            if (!quiet && r.reason && r.reason !== "empty" && r.reason !== "mixedimg") {
                 host.addItem({
                     icon: "iconInfo",
                     label: menuHint(r.reason),
@@ -4669,6 +4738,8 @@ class SiYuanXref extends Plugin {
     onunload() {
         try {
             clearTimeout(this._autoTimer);
+            clearTimeout(this._scopeBookTimer);
+            this._scopeBookTimer = null;
             clearTimeout(this._retryTimer);
             this._retryTimer = null;
             clearTimeout(this._paintTimer);
@@ -4765,23 +4836,6 @@ class SiYuanXref extends Plugin {
      *  - dryRun 只算不写（真机零写入验证入口）；
      *  - 引用只刷范围内；撤销记录按块带 doc，可整批回放。
      */
-    /** v1.1.6：读当前文档的 custom-doc-num-meta，按 scopePrefixLevel 取章节前缀。
-     *  一次 batchGetBlockAttrs，只读本文档；返回 undefined = 无 meta（保持原口径），
-     *  返回 "" = 层级不够、不显示前缀。 */
-    async currentScopePrefix(docId) {
-        if (!docId) return undefined;
-        try {
-            const r = await api("/api/attr/batchGetBlockAttrs", { ids: [docId] });
-            const a = r && r[docId];
-            const raw = a && a["custom-doc-num-meta"];
-            if (!raw) return undefined;
-            const m = JSON.parse(String(raw));
-            return xrScopePrefix(m && m.rootNum,
-                xrLevelForDoc({ meta: m }, this.settings.scopePrefixLevel,
-                    this.settings.scopePrefixLevelByTarget));
-        } catch (e) { return undefined; }
-    }
-
     /** v1.1.8：取当前文档所属的第 N 级章节链，用于自动收窄交叉引用窗口。
      *  当前文档已有 meta → 直接取 rootNum 前 N 段；还没编号（新建文档）→
      *  沿 path 找到第 N 级祖先，读它的 rootNum。取不到返回空串 = 不收窄。 */
@@ -5013,17 +5067,41 @@ class SiYuanXref extends Plugin {
             } else {
                 this._deadPending = null;
             }
-            /* v1.1.4：范围功能开启时，单文档自动重排也按本文档章节号编号。
-             * 只读当前文档的一个属性，不扫范围、不影响其它文档。 */
-            let planSettings = this.settings;
-            if (this.settings.scopeEnabled && this.settings.scopeMode === "bydoc") {
-                const prefix = await this.currentScopePrefix(docId);
-                if (prefix === "") {
-                    planSettings = Object.assign({}, this.settings, { __scopeNoPrefix: true });
-                } else if (prefix) {
-                    planSettings = Object.assign({}, this.settings, { __scopePrefix: prefix });
+            /* v1.2.20：按「本文档是否在书里」分口径，mode 只服务独立文档。
+             *  - 书内 bydoc：rootNum 前缀 + 文内连续，mode 不参与（否则被 chapter 拆章）。
+             *  - 书内 continuous：单文档轮算不出全书起点，交给范围轮写号；本地写会得到 1..n 的错号。
+             *  - 无 meta：按用户选的 mode（continuous / chapter）。 */
+            const ownMeta = await this.docOwnMeta(docId);
+            const dec = xrPlanSettingsForDoc(this.settings, ownMeta);
+            if (dec.scopeRound) {
+                // 公式/代码编辑器开着时任何写回都会冲掉输入，范围轮同样先让路
+                if (o.auto && mathEditing()) {
+                    this.trace({ renumber: "giveup", why: "math-editing" });
+                    this.noteGiveup("math-editing", docId);
+                    this.scheduleRetry();
+                    return;
                 }
+                this.handleDead(deadIds);
+                if (protyle) this._lastProtyle = protyle;
+                if (o.auto) {
+                    // v1.2.20：全书连续必须交给范围轮；自动轮加 3 秒防抖，
+                    // 连续敲字时只在停手后跑一次，避免每次停顿都扫一遍全书。
+                    if (this._scopeBookTimer) clearTimeout(this._scopeBookTimer);
+                    this._scopeBookTimer = setTimeout(() => {
+                        this._scopeBookTimer = null;
+                        this.renumberScope({ auto: true, silent: true }).catch(() => {});
+                    }, 3000);
+                    this.trace({ renumber: "scope-debounce", doc: docId });
+                    return;
+                }
+                if (this._scopeBookTimer) {
+                    clearTimeout(this._scopeBookTimer);
+                    this._scopeBookTimer = null;
+                }
+                if (!o.silent) showMessage(tr("msg.scope.bookmode"), 6000);
+                return await this.renumberScope({ auto: false, silent: !!o.silent });
             }
+            const planSettings = dec.planSettings;
             const r = buildPlan(blocks, planSettings, burnable, excl);
             if (!r.plan.length && !r.refs.length) {
                 if (!o.silent) showMessage(tr("msg.noTargets"), 4000);
@@ -5496,32 +5574,18 @@ class SiYuanXref extends Plugin {
         return out.length ? out : null;
     }
 
-    /** 当前文档的编号元数据：一次 SQL，必要时沿 path 再查一次祖先；各层级链键本地算。 */
-    async pickerChainMeta(docId) {
+    /** v1.2.19：读本文档**自身**的 custom-doc-num-meta（一次 SQL，只读一遍）。
+     *  无 meta / 坏值 → null。面板据此决定单文档 vs 范围；单文档重排据此决定
+     *  编号口径（v1.2.20）。旧版会沿 path 找有编号的祖先当本文档的链键，但
+     *  祖先号 ≠ 本文档号：本文档的行链键仍是空，照样被范围过滤剔光。 */
+    async docOwnMeta(docId) {
         if (!docId) return null;
         const escId = (x) => String(x).replace(/'/g, "''");
         try {
-            const rows = await sql("SELECT id, path, ial FROM blocks WHERE id='"
+            const rows = await sql("SELECT ial FROM blocks WHERE id='"
                 + escId(docId) + "' LIMIT 1");
             const row = rows && rows[0];
-            if (!row) return null;
-            let meta = xrParseMeta(row.ial);
-            if (!meta || !meta.rootNum) {
-                const seg = String(row.path || "").replace(/^\/+/, "").split("/")
-                    .map((x) => String(x).replace(/\.sy$/, "")).filter(Boolean);
-                const ancIds = seg.slice(0, -1).reverse().filter((x) => x !== docId);
-                if (ancIds.length) {
-                    const inl = ancIds.map((x) => "'" + escId(x) + "'").join(",");
-                    const ars = await sql("SELECT id, ial FROM blocks WHERE id IN ("
-                        + inl + ") LIMIT -1");
-                    const byAnc = new Map((ars || []).map((r) => [r.id, r]));
-                    for (const aid of ancIds) {
-                        const m = xrParseMeta(byAnc.get(aid) && byAnc.get(aid).ial);
-                        if (m && m.rootNum) { meta = m; break; }
-                    }
-                }
-            }
-            return meta || null;
+            return row ? xrParseMeta(row.ial) : null;
         } catch (e) { return null; }
     }
 
@@ -5574,7 +5638,13 @@ class SiYuanXref extends Plugin {
         let rebuildRows = null;           // v1.2.8：切层级时重算 rows / sections
         let widenNote = "";               // v1.2.11：空范围自动放宽的说明，显示在头部副标题
         try {
-            if (this.settings.scopeEnabled) {
+            /* v1.2.19：先判本文档是否在书籍编号范围 —— 只看**自身**的
+             * custom-doc-num-meta。没有 = 不是书籍 / 书籍子文档 → 单文档模式，
+             * 直接走下面的 collectFresh + buildPlan，绝不进「范围层级」链过滤。
+             * 旧版只判 scopeEnabled：无 meta 时链键为空，xrPickerRowsInLevel()
+             * 返回空数组，自动放宽也只在 1..n 级里转，于是面板一条都列不出来。 */
+            const ownMeta = await this.docOwnMeta(docId);
+            if (this.settings.scopeEnabled && xrDocInBook(ownMeta)) {
                 /* v1.2.8：窗口范围 = 当前文档所在「第 L 级链」（rootID | rootNum 前 L 段）。
                  * L 默认 = 章节前缀层级 - 1（同篇内可跨章）；想跨篇就切到 1 级目录。
                  * 层级信息直接取文档属性 custom-doc-num-meta 的 rootID / rootNum，
@@ -5623,8 +5693,8 @@ class SiYuanXref extends Plugin {
                 curLevel = xrPickerSavedLevel(this.settings.pickerLevel, levelList,
                     xrPickerDefaultLevel(this.settings.scopePrefixLevel,
                         this.settings.scopePickerAuto !== false));
-                // 当前文档编号元数据只查一次，各层级链键本地算（原来每级各一次 SQL）
-                const curMeta = await this.pickerChainMeta(docId);
+                // 当前文档编号元数据上面已查过一次，各层级链键本地算（不再重复 SQL）
+                const curMeta = ownMeta;
                 if (levelList.length) {
                     for (const L of levelList) {
                         levelKeys.set(L, L > 0 ? xrChainKeyFromMeta(curMeta, L) : "");
@@ -6071,6 +6141,7 @@ SiYuanXref.__test = { collectBlocks: collectBlocks, buildPlan: buildPlan, applyP
     xrScopeShouldRun: xrScopeShouldRun, xrBuildScopePlan: xrBuildScopePlan,
     xrMapLimit: xrMapLimit, XR_REF_RE: XR_REF_RE,
     xrDecodeIalText: xrDecodeIalText, xrParseMeta: xrParseMeta,
+    xrDocInBook: xrDocInBook, xrPlanSettingsForDoc: xrPlanSettingsForDoc,
     xrScopePrefix: xrScopePrefix,
     xrLevelChain: xrLevelChain, xrDocsInChain: xrDocsInChain,
     xrChainKeyFromMeta: xrChainKeyFromMeta, xrDocChainKey: xrDocChainKey,
